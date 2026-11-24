@@ -42,7 +42,8 @@ jobs:
           include-hidden-files: true
           if-no-files-found: ignore
       - run: npm run build && npm run check
-      - run: npm run check:rust
+      - name: Rust 範例執行器與原版對照
+        run: node scripts/migration/compare-examples.mjs
       - run: npx playwright install --with-deps chromium
       - run: npm run build && npm run check && npm run test:browser
         env:

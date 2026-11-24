@@ -249,3 +249,17 @@ export function applyNativeFences(lessons) {
   if(cursor!==result.length) throw new Error('Rust 範例回傳多餘欄位');
   console.log('Rust 範例抽取與標注驗證：'+total+' 段逐字比對通過');
 }
+
+export function verifyNativeExamples(lessons) {
+  const fields=[];
+  for(const lesson of lessons){
+    fields.push(lesson.entry.slug,String(lesson.nativeFences.length));
+    for(const token of lesson.nativeFences) fields.push(String(token.map[0]+1),token.info,token.content);
+  }
+  const result=invoke('examples-v1',lessons.length,fields);
+  const [version,compiled,run,error,project,messageCount,...messages]=result;
+  if(![compiled,run,error,project,messageCount].every(x=>/^\d+$/.test(x))||messages.length!==Number(messageCount)){
+    throw new Error('Rust 範例執行器回傳格式不一致');
+  }
+  return {version,compiled:Number(compiled),run:Number(run),error:Number(error),project:Number(project),messages};
+}

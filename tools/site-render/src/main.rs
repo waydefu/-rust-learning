@@ -9,6 +9,7 @@ mod landing;
 mod reader;
 mod highlight;
 mod fences;
+mod examples;
 
 type Result<T> = std::result::Result<T, String>;
 const LIMIT: u64 = 64 * 1024 * 1024;
@@ -214,6 +215,7 @@ fn process(input: &str) -> Result<Vec<u8>> {
         "reader-v1" => reader::process_reader(n, &mut fields, &mut result)?,
         "highlight-v1" => highlight::process_highlight(n, &mut fields, &mut result)?,
         "fences-v1" => fences::process_fences(n, &mut fields, &mut result)?,
+        "examples-v1" => examples::process_examples(n, &mut fields, &mut result)?,
         "markdown-v1" => {
             for _ in 0..n {
                 let source = field(&mut fields)?;
