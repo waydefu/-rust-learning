@@ -36,6 +36,8 @@
 
 編寫原則：由生活問題引出概念，以先備知識推導原因，新名詞第一次出現時用白話解釋；例子須說明結果與限制；不要將作者的寫作流程或內部分類名稱當成可見的標題。保留進階細節與錯誤案例，並用可操作的練習驗證理解。此輪未改寫 A01–A08，也未進行真人閱讀測試。
 
+第 13 章將 `next() -> Option<Self::Item>` 明確標記為行內程式碼，避免 CommonMark 將泛型中的 `Self::Item` 解讀成 URI 自動連結；不改變語法含義或 fenced Rust 範例。
+
 ## 如何驗收變更
 
 `npm run check` 驗證所有 Markdown 來源、頁面與錨點。在每一份 Markdown 中，Rust 程式碼區塊必須標示驗證方式。**run** 編譯且執行。**program** 驗證完整 main。**fragment** 在檢查時補上 main。**continuation** 和前一 Rust 區塊合併。**error E0382** 驗證預期的診斷碼。**test** 執行 Rust 測試。**project name:src/file.rs** 抽到暫存 Cargo 專案驗證。可在檢查輸出定位錯誤的教材與行號。

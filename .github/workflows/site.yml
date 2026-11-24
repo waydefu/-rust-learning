@@ -14,6 +14,9 @@ jobs:
     name: 教材與網站驗證
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      REQUIRE_NATIVE_MARKDOWN: '1'
+      VERIFY_SITE_WRITE: '1'
     steps:
       - uses: actions/checkout@v6
         with:
@@ -28,6 +31,16 @@ jobs:
       - run: cargo test --locked --manifest-path tools/lesson-check/Cargo.toml
       - run: cargo test --locked --manifest-path tools/site-tools/Cargo.toml
       - run: cargo test --locked --manifest-path tools/site-render/Cargo.toml
+      - name: Rust-anything 行為錄製與重播
+        shell: bash
+        run: bash scripts/migration/replay-site-write.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: migration-replay
+          path: .migration-evidence/
+          include-hidden-files: true
+          if-no-files-found: ignore
       - run: npm run build && npm run check
       - run: npm run check:rust
       - run: npx playwright install --with-deps chromium
@@ -63,6 +76,8 @@ jobs:
     needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      REQUIRE_NATIVE_MARKDOWN: '1'
     permissions:
       contents: read
       actions: read
@@ -151,4 +166,4 @@ jobs:
           grep -Fq '.lesson-callout' /tmp/rust-site.css
           test -s /tmp/rust-site.css
           curl --fail --silent --show-error --retry 4 --retry-all-errors --retry-delay 2 --max-time 20 "$endpoint/build-render-report.json" -o /tmp/rust-render-report.json
-          jq -e '.layout == "rust" and .pages == 34 and (.markdown | length) == 31' /tmp/rust-render-report.json
+          jq -e '.layout == "rust" and .pages == 34 and (.markdown | length) == 31 and all(.markdown[]; .renderer == "rust")' /tmp/rust-render-report.json
