@@ -1,7 +1,7 @@
 //! Node-independent course input, native rendering, and CLI.
 use super::{
     Fence, Heading, Result, callout, fences, highlight, landing, layout, markdown, metadata,
-    navigation, page_data, process_fields, reader,
+    navigation, page_data, reader,
 };
 use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
 use serde_json::{Value, json};
@@ -12,7 +12,6 @@ use std::{
 };
 #[path = "native_check.rs"]
 mod check;
-type Fields = Vec<String>;
 fn fail(e: impl std::fmt::Display) -> String {
     e.to_string()
 }
@@ -39,15 +38,6 @@ fn num(v: &Value, key: &str) -> Result<usize> {
         .and_then(|n| usize::try_from(n).ok())
         .ok_or_else(|| format!("缺少數量 {key}"))
 }
-fn add(f: &mut Fields, values: &[&str]) {
-    f.extend(values.iter().map(|v| (*v).to_owned()));
-}
-fn number(f: &mut Fields, n: usize) {
-    f.push(n.to_string());
-}
-fn flag(f: &mut Fields, b: bool) {
-    f.push(b.to_string());
-}
 fn safe_path(s: &str) -> bool {
     !s.is_empty()
         && s.split('/').all(|p| {
@@ -66,12 +56,6 @@ fn base_path() -> Result<String> {
         return Err("BASE_PATH 必須是 / 或安全部署子路徑".into());
     }
     Ok(b)
-}
-fn packet(mode: &str, n: usize, fields: Fields) -> Result<Vec<String>> {
-    if fields.iter().any(|f| f.contains('\0')) {
-        return Err("資料含 NUL".into());
-    }
-    process_fields(mode, n, fields.iter().map(String::as_str))
 }
 #[derive(Debug)]
 struct Entry {
