@@ -13,7 +13,7 @@ jobs:
   verify:
     name: 教材與網站驗證
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       VERIFY_SITE_WRITE: '1'
     steps:

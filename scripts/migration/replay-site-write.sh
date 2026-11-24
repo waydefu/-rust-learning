@@ -14,11 +14,14 @@ finish() {
   trap - EXIT
   set +e
   mkdir -p "$root/.migration-evidence"
-  for file in record.json original.json rust.json inputs.jsonl; do
+  for file in record.json original.json rust.json inputs.jsonl full-record.json full-original.json full-rust.json full-inputs.jsonl; do
     if [ -f "$scratch/$file" ]; then cp "$scratch/$file" "$root/.migration-evidence/"; fi
   done
   if [ -d "$scratch/recording/rust/app-cases" ]; then
     cp -r "$scratch/recording/rust/app-cases" "$root/.migration-evidence/app-cases"
+  fi
+  if [ -d "$scratch/full-app/rust/app-cases" ]; then
+    cp -r "$scratch/full-app/rust/app-cases" "$root/.migration-evidence/full-app-cases"
   fi
   rm -rf "$scratch"
   exit "$status"
@@ -50,3 +53,23 @@ for result in original rust; do
   jq -e --argjson n "$expected" '.total == $n and .passed == $n and .skipped == 0 and (.failures | length) == 0 and ((.fallback.cases // 0) == 0)' "$scratch/$result.json"
 done
 cat "$scratch/recording/rust/app-cases/replay-report.md"
+
+# Full CLI black-box observation in a separate recording directory. Each
+# observed run starts from a fresh copy of the actual source tree.
+mkdir -p "$scratch/full-app"
+cp scripts/migration/observe-full-cli.mjs "$scratch/full-app/observe.mjs"
+node scripts/migration/full-cli-cases.mjs > "$scratch/full-inputs.jsonl"
+export RUST_LEARNING_REPLAY_ROOT="$root"
+export RUST_LEARNING_REPLAY_TARGET="$scratch/full-target"
+"$tool" app record "$scratch/full-app" --name rust-learning-cli --inputs "$scratch/full-inputs.jsonl" \
+  --no-traps --timeout 240 --json -- node observe.mjs legacy > "$scratch/full-record.json"
+cat "$scratch/full-record.json"
+expected="$(wc -l < "$scratch/full-inputs.jsonl")"
+jq -e --argjson n "$expected" '.cases == $n and (.noisy | length) == 0 and (.unstable | length) == 0 and (.timed_out | length) == 0' "$scratch/full-record.json"
+"$tool" app replay "$scratch/full-app" --json > "$scratch/full-original.json"
+"$tool" app replay "$scratch/full-app" --build "node observe.mjs native" --json > "$scratch/full-rust.json"
+for result in full-original full-rust; do
+  cat "$scratch/$result.json"
+  jq -e --argjson n "$expected" '.total == $n and .passed == $n and .skipped == 0 and (.failures | length) == 0 and ((.fallback.cases // 0) == 0)' "$scratch/$result.json"
+done
+cat "$scratch/full-app/rust/app-cases/replay-report.md"

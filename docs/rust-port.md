@@ -76,7 +76,7 @@ PR #10 已合併；PR #11 拆分 Pages 產物上傳與部署 job，main `3d983a3
 
 ## 第十階段：純 Rust CLI 與完整行為對照
 
-PR #12 已合併，main a51017e 的 Actions #40 首次發布成功。此 PR #13 新增 site-render 的 build/check/check-rust/dev 入口，讀取同一份 catalog.json、site-data.json 及原始教材，使用鎖定 serde_json、scraper/html5ever、url 取代 Node 解碼橋接；高亮、Markdown、模板、互動 JSON、索引、驗證規則與原生工具協作均由 Rust 執行。正式 Pages job 不再執行 npm ci，Node 只用於參考版及瀏覽器測試。CI 新增完整網站樹對照、錯誤路徑拒絕、原生檢查器正負例、Rust 範例對照及無 Node 的獨立驗證。根目錄和子路徑的原生輸出均須通過。實際 CI 結果以 PR #13 最新紀錄為準；未合併或部署。rust-anything writer 原有 14 案重播保留，完整應用以實際 CLI 產物與檢查結果作黑箱比對，不宣稱已執行上游 scaffold 的 app lift。
+PR #12 已合併，main a51017e 的 Actions #40 首次發布成功。此 PR #13 新增 site-render 的 build/check/check-rust/dev 入口，讀取同一份 catalog.json、site-data.json 及原始教材，使用鎖定 serde_json、scraper/html5ever、url 取代 Node 解碼橋接；高亮、Markdown、模板、互動 JSON、索引、驗證規則與原生工具協作均由 Rust 執行。正式 Pages job 不再執行 npm ci，Node 只用於參考版及瀏覽器測試。CI 新增完整網站樹對照、錯誤路徑拒絕、原生檢查器正負例、Rust 範例對照及無 Node 的獨立驗證。根目錄和子路徑的原生輸出均須通過。實際 CI 結果以 PR #13 最新紀錄為準；未合併或部署。rust-anything writer 原有 14 案重播保留。另以全 CLI 實際執行的黑箱觀察 adapter 錄製根路徑、Pages 子路徑、無效路徑、缺少教材、範例執行與本機 HTTP 預覽六案；每次重新複製真實課程樹，以全部輸出 SHA-256（報告 JSON 僅正規化 key order）、退出碼、保留舊產物、驗證摘要及 HTTP status/header/body 雜湊為觀察契約，原版和 Rust 皆須重播成功，無 fallback。adapter 只供驗收，不是正式 CLI 依賴。未使用上游 scaffold，故不宣稱執行 app lift。
 
 ### 動效與無障礙
 

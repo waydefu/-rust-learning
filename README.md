@@ -35,7 +35,7 @@ npm run test:browser
 
 ## Rust 移植驗證
 
-建置器使用 Rust 的 `site-write` 建立網站輸出、複製資源並替換 `dist`；Node 原版寫入器保留在 `scripts/migration/`，只作測試對照。CI 會逐位元組比較完整網站輸出，並使用固定版本的 rust-anything v4.0.0 對獨立寫入器的成功與錯誤案例執行錄製及重播。Linux x86_64 可執行 `bash scripts/migration/replay-site-write.sh`；它只在暫存目錄下載經 SHA-256 驗證的工具，不變更 Agent 設定或教材工具鏈。詳見 [移植紀錄](docs/rust-port.md)。
+建置器使用 Rust 的 `site-write` 建立網站輸出、複製資源並替換 `dist`；Node 原版寫入器保留在 `scripts/migration/`，只作測試對照。CI 會逐位元組比較完整網站輸出，並使用固定版本的 rust-anything v4.0.0 對獨立寫入器及完整 CLI（build/check/check-rust/dev、失敗保留產物）執行錄製及重播。Linux x86_64 可執行 `bash scripts/migration/replay-site-write.sh`；它只在暫存目錄下載經 SHA-256 驗證的工具，不變更 Agent 設定或教材工具鏈。詳見 [移植紀錄](docs/rust-port.md)。
 
 另有獨立 CI job 在沒有 node_modules 且阻擋 node/npm/npx 的 PATH 下執行 build、check、check-rust，Pages 發布也直接使用 Rust CLI。舊版只保留為測試對照。
 
