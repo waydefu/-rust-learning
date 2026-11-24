@@ -44,6 +44,14 @@ export function makeSite(base, {nativeLayout = false} = {}) {
 <link rel="icon" href="${asset('favicon.svg')}" type="image/svg+xml">
 <script src="${asset('theme.js')}"></script>
 <link rel="stylesheet" href="${asset('site.css')}">
+<link rel="stylesheet" href="${asset('motion.css')}">
+<link rel="stylesheet" href="${asset('concept-labs.css')}">
+<link rel="modulepreload" href="${asset('modules/context.js')}">
+<link rel="modulepreload" href="${asset('modules/motion.js')}">
+<link rel="modulepreload" href="${asset('modules/navigation.js')}">
+<link rel="modulepreload" href="${asset('modules/progress.js')}">
+<link rel="modulepreload" href="${asset('modules/reader.js')}">
+<link rel="modulepreload" href="${asset('modules/concept-labs.js')}">
 <script type="module" src="${asset('app.js')}"></script>
 </head>
 <body>

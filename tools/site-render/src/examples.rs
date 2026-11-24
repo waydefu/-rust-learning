@@ -348,7 +348,7 @@ impl Runner {
 pub(super) fn process_examples<'a>(
     n: usize,
     f: &mut impl Iterator<Item = &'a str>,
-    out: &mut Vec<u8>,
+    out: &mut Vec<String>,
 ) -> Result<()> {
     // Parse the entire packet before running any command.
     let mut lessons = Vec::new();

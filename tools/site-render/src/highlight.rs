@@ -570,7 +570,7 @@ pub(super) fn block(info: &str, highlighted: &str, icon: &str) -> String {
 pub(super) fn process_highlight<'a>(
     n: usize,
     f: &mut impl Iterator<Item = &'a str>,
-    out: &mut Vec<u8>,
+    out: &mut Vec<String>,
 ) -> Result<()> {
     let icon = field(f)?;
     for _ in 0..n {

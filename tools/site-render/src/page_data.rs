@@ -36,7 +36,7 @@ fn flag<'a>(f: &mut impl Iterator<Item = &'a str>) -> Result<bool> {
 pub(super) fn process_data<'a>(
     n: usize,
     f: &mut impl Iterator<Item = &'a str>,
-    out: &mut Vec<u8>,
+    out: &mut Vec<String>,
 ) -> Result<()> {
     let mut shared = String::from("{");
     property(&mut shared, "base", field(f)?);

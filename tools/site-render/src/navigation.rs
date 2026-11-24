@@ -82,7 +82,7 @@ fn navigation(
 pub(super) fn process_navigation<'a>(
     n: usize,
     fields: &mut impl Iterator<Item = &'a str>,
-    out: &mut Vec<u8>,
+    out: &mut Vec<String>,
 ) -> Result<()> {
     let base = field(fields)?;
     if base != "/"

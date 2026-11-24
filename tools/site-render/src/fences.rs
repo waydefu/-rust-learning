@@ -69,7 +69,7 @@ pub(super) fn extract(source: &str) -> Result<Vec<(String, String)>> {
 pub(super) fn process_fences<'a>(
     n: usize,
     f: &mut impl Iterator<Item = &'a str>,
-    out: &mut Vec<u8>,
+    out: &mut Vec<String>,
 ) -> Result<()> {
     for _ in 0..n {
         let source = field(f)?;

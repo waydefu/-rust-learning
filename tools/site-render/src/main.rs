@@ -300,12 +300,11 @@ fn layout(
     render_template(TEMPLATE, &values)
 }
 
-fn emit(out: &mut Vec<u8>, value: &str) -> Result<()> {
+fn emit(out: &mut Vec<String>, value: &str) -> Result<()> {
     if value.contains('\0') {
         return Err("輸出欄位包含 NUL".into());
     }
-    out.extend_from_slice(value.as_bytes());
-    out.push(0);
+    out.push(value.to_owned());
     Ok(())
 }
 
@@ -316,9 +315,29 @@ fn process(input: &str) -> Result<Vec<u8>> {
         .split('\0');
     let mode = field(&mut fields)?;
     let n = count(&mut fields, 1000)?;
+    let result = process_fields(mode, n, fields)?;
+    let mut bytes = Vec::new();
+    for value in std::iter::once(mode.to_owned())
+        .chain(std::iter::once(n.to_string()))
+        .chain(result)
+    {
+        bytes.extend_from_slice(value.as_bytes());
+        bytes.push(0);
+    }
+    Ok(bytes)
+}
+
+// The migration protocol is only a boundary adapter. Native callers pass
+// fields directly, without framing, UTF-8 decoding or parsing a response.
+fn process_fields<'a>(
+    mode: &str,
+    n: usize,
+    mut fields: impl Iterator<Item = &'a str>,
+) -> Result<Vec<String>> {
+    if n > 1000 {
+        return Err("渲染資料數量超過上限".into());
+    }
     let mut result = Vec::new();
-    emit(&mut result, mode)?;
-    emit(&mut result, &n.to_string())?;
     match mode {
         "metadata-v1" => metadata::process_metadata(n, &mut fields, &mut result)?,
         "anchors-v1" => metadata::process_anchors(n, &mut fields, &mut result)?,

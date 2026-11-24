@@ -105,7 +105,7 @@ pub(super) fn headings(source: &str) -> Result<HeadingMetadata> {
 pub(super) fn process_metadata<'a>(
     n: usize,
     fields: &mut impl Iterator<Item = &'a str>,
-    out: &mut Vec<u8>,
+    out: &mut Vec<String>,
 ) -> Result<()> {
     for _ in 0..n {
         let (title, headings) = headings(field(fields)?)?;
@@ -122,7 +122,7 @@ pub(super) fn process_metadata<'a>(
 pub(super) fn process_anchors<'a>(
     n: usize,
     fields: &mut impl Iterator<Item = &'a str>,
-    out: &mut Vec<u8>,
+    out: &mut Vec<String>,
 ) -> Result<()> {
     for _ in 0..n {
         let labels = (0..count(fields, 5000)?)

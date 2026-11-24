@@ -1,5 +1,7 @@
 //! Node-independent course input, native rendering, and CLI.
-use super::{Fence, Heading, Result, callout, fences, highlight, markdown, metadata, process};
+use super::{
+    Fence, Heading, Result, callout, fences, highlight, markdown, metadata, process_fields,
+};
 use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
 use serde_json::{Value, json};
 use std::{
@@ -73,15 +75,10 @@ fn framed(mode: &str, n: usize, fields: &Fields) -> Result<String> {
     Ok(format!("{mode}\0{n}\0{}\0", fields.join("\0")))
 }
 fn packet(mode: &str, n: usize, fields: Fields) -> Result<Vec<String>> {
-    let raw = String::from_utf8(process(&framed(mode, n, &fields)?)?).map_err(fail)?;
-    let mut it = raw
-        .strip_suffix('\0')
-        .ok_or("原生回傳缺少結尾")?
-        .split('\0');
-    if it.next() != Some(mode) || it.next() != Some(n.to_string().as_str()) {
-        return Err("原生回傳版本不相容".into());
+    if fields.iter().any(|f| f.contains('\0')) {
+        return Err("資料含 NUL".into());
     }
-    Ok(it.map(str::to_owned).collect())
+    process_fields(mode, n, fields.iter().map(String::as_str))
 }
 fn child_tool(
     manifest: &str,

@@ -167,7 +167,7 @@ fn outline<'a>(
 pub(super) fn process_reader<'a>(
     n: usize,
     f: &mut impl Iterator<Item = &'a str>,
-    out: &mut Vec<u8>,
+    out: &mut Vec<String>,
 ) -> Result<()> {
     let base = field(f)?;
     if !base.starts_with('/')

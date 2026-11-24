@@ -89,7 +89,7 @@ fn card(
 pub(super) fn process_landing<'a>(
     n: usize,
     fields: &mut impl Iterator<Item = &'a str>,
-    out: &mut Vec<u8>,
+    out: &mut Vec<String>,
 ) -> Result<()> {
     if n != 3 {
         return Err("首頁渲染必須包含兩頁".into());
@@ -280,7 +280,7 @@ mod tests {
         ];
         let mut output = Vec::new();
         process_landing(3, &mut fields.into_iter(), &mut output).unwrap();
-        let html = String::from_utf8(output).unwrap();
+        let html = output.join("\0");
         assert!(html.contains("data-start"));
         assert!(html.contains("第 1–1 章"));
         assert!(html.contains("/course/resources/extra/"));

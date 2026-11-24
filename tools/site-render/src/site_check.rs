@@ -101,7 +101,7 @@ fn read_index<'a>(f: &mut impl Iterator<Item = &'a str>) -> Result<Vec<IndexEntr
 pub(super) fn process_site_check<'a>(
     n: usize,
     f: &mut impl Iterator<Item = &'a str>,
-    out: &mut Vec<u8>,
+    out: &mut Vec<String>,
 ) -> Result<()> {
     let base = field(f)?;
     if !base.starts_with('/')
