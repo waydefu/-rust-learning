@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { stat } from 'node:fs/promises';
 import { join } from 'node:path';
-import { projectRoot } from '../src/course.mjs';
+import { projectRoot } from './support/course.mjs';
 
 const origin = 'https://rust-learning.test';
 const base = '/-rust-learning/';

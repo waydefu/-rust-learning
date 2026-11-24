@@ -11,15 +11,11 @@
     "dev": "cargo run --quiet --locked --manifest-path tools/site-render/Cargo.toml -- dev",
     "check": "cargo run --quiet --locked --manifest-path tools/site-render/Cargo.toml -- check",
     "check:rust": "cargo run --quiet --locked --manifest-path tools/site-render/Cargo.toml -- check-rust",
-    "test:browser": "playwright test"
-  },
-  "dependencies": {
-    "highlight.js": "11.12.0",
-    "markdown-it": "14.3.3"
+    "test:browser": "playwright test",
+    "test:regression": "node scripts/regression/check-native.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.14.0",
-    "@playwright/test": "1.62.0",
-    "parse5": "8.1.1"
+    "@playwright/test": "1.62.0"
   }
 }

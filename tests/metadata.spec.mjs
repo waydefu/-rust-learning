@@ -1,5 +1,26 @@
 import { test, expect } from '@playwright/test';
-import { nativeAnchors } from '../src/native-render.mjs';
+import { execFileSync } from 'node:child_process';
+import { projectRoot } from './support/course.mjs';
+
+function nativeAnchors(groups) {
+  const fields = ['anchors-v1', String(groups.length), ...groups.flatMap(labels => [String(labels.length), ...labels])];
+  const output = execFileSync(process.env.CARGO || 'cargo', [
+    'run', '--quiet', '--locked', '--manifest-path', 'tools/site-render/Cargo.toml',
+  ], { cwd: projectRoot, input: fields.join('\0') + '\0', encoding:'utf8', maxBuffer:1024*1024 });
+  const result = output.split('\0');
+  if (result.pop() !== '' || result.shift() !== 'anchors-v1' || result.shift() !== String(groups.length)) {
+    throw new Error('Rust 錨點回傳格式錯誤');
+  }
+  let cursor=0;
+  const actual=groups.map(labels=>{
+    if (Number(result[cursor++]) !== labels.length) throw new Error('錨點數量錯誤');
+    const ids=result.slice(cursor,cursor+labels.length);
+    cursor+=labels.length;
+    return ids;
+  });
+  if (cursor!==result.length) throw new Error('錨點含有額外欄位');
+  return actual;
+}
 
 function original(labels) {
   const seen = new Map();

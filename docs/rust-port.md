@@ -96,3 +96,7 @@ PR #14 首輪 [Actions](https://github.com/waydefu/-rust-learning/actions/runs/4
 CI 的臨時 Cargo metadata 診斷（run 45398892481）實際產生鎖檔差異：url 2.5.9 的依賴清單新增 serde；已按該差異補齊並移除臨時 Job。正式驗證仍使用 --locked。
 
 技術債清理階段：所有現有 `rust run` 範例都宣告明確 stdout 契約（含無輸出），stderr 不計入預期輸出；程式碼中的註解不改變執行語意。新版執行器限制環境變數及輸出量並在 Unix 逾時時終止程序群組，這些是防禦措施而非安全沙箱。
+
+## PR #15：架構清理與固定參考
+
+前端改成職責分離的 ES modules 與獨立動效/實驗室樣式；Rust 工具統一 workspace，正式流程直接呼叫函式庫；移植協定只留作固定參考相容入口。依賴 scraper 0.25.0 經 Cargo 實際解析移除 fxhash。歷史 Node 原始碼移出目前工作樹，保留在已全綠的 `b2c5abe32610f6f098e46ec2501c9514fed2066d`（[Actions](https://github.com/waydefu/-rust-learning/actions/runs/45400927384)）；`scripts/regression/verify-reference.sh` 在暫存目錄取出固定參考，搭配目前 HEAD 的 Rust 工具和內容，執行原有完整產物、負例及 rust-anything 重播。另有獨立 `check-native.mjs` 驗證可重現性與拒絕無效輸入。不宣稱固定參考能證明所有未來新輸入，也不在未確認的新 CI 上宣稱通過。

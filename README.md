@@ -4,7 +4,7 @@
 
 ## 本機使用
 
-建置網站只需要 Cargo 及 Rust 1.85.1（由 rust-toolchain.toml 指定）。正式建置、檢查、教材範例與本機預覽均由 Rust CLI 提供，不需要 Node.js、npm 或 node_modules。Node.js 24 只用於 CI 的舊版對照及 Playwright 瀏覽器測試。一般閱讀只需瀏覽器。
+建置網站只需要 Cargo 及 Rust 1.85.1（由 rust-toolchain.toml 指定）。正式建置、檢查、教材範例與本機預覽均由 Rust CLI 提供，不需要 Node.js、npm 或 node_modules。Node.js 24 只用於測試。舊版對照程式從固定歷史提交抽取到暫存目錄，不再維護在目前原始碼樹。一般閱讀只需瀏覽器。
 
 ```sh
 cargo run --locked --manifest-path tools/site-render/Cargo.toml -- dev
@@ -19,7 +19,7 @@ cargo run --locked --manifest-path tools/site-render/Cargo.toml -- check-rust
 cargo test --locked --workspace --manifest-path tools/Cargo.toml
 BASE_PATH=/-rust-learning/ cargo run --locked --manifest-path tools/site-render/Cargo.toml -- build
 BASE_PATH=/-rust-learning/ cargo run --locked --manifest-path tools/site-render/Cargo.toml -- check
-# 僅做舊版與瀏覽器測試時需要 Node：
+# 僅做測試時需要 Node：
 npm ci
 npx playwright install chromium
 npm run test:browser
@@ -29,20 +29,20 @@ npm run test:browser
 
 ## 渲染相容性
 
-正式 Rust CLI 直接讀取 catalog、site-data.json 和 Markdown，原生生成全部網站產物。CI 使用舊版建置器比對根路徑及 Pages 子路徑的完整網站樹；任何差異均阻止合併與部署。成功的 `dist/build-render-report.json` 記錄各篇正文及各語言原生生成數量，沒有回退到 Node 的路徑。
+正式 Rust CLI 直接讀取 catalog、site-data.json 和 Markdown，原生生成全部網站產物。CI 使用固定歷史版本比對根路徑及 Pages 子路徑的完整網站樹，另有獨立原生重建與負例驗證；任何未經確認的差異均阻止部署。成功的 `dist/build-render-report.json` 記錄各篇正文及各語言原生生成數量，沒有回退到 Node 的路徑。
 
 ## Rust 移植驗證
 
-建置器直接呼叫 Rust 函式庫的 `site_write::write_site` 建立網站輸出、複製資源並替換 `dist`；Node 原版寫入器保留在 `scripts/migration/`，只作測試對照。CI 會逐位元組比較完整網站輸出，並使用固定版本的 rust-anything v4.0.0 對獨立寫入器及完整 CLI（build/check/check-rust/dev、失敗保留產物）執行錄製及重播。Linux x86_64 可執行 `bash scripts/migration/replay-site-write.sh`；它只在暫存目錄下載經 SHA-256 驗證的工具，不變更 Agent 設定或教材工具鏈。詳見 [移植紀錄](docs/rust-port.md)。
+建置器直接呼叫 Rust 函式庫的 `site_write::write_site` 建立網站輸出、複製資源並替換 `dist`；Node 原版寫入器及建置器留在固定歷史 Git 提交，只在暫存目錄中作測試對照。CI 會逐位元組比較完整網站輸出，並使用固定版本的 rust-anything v4.0.0 對獨立寫入器及完整 CLI（build/check/check-rust/dev、失敗保留產物）執行錄製及重播。Linux x86_64 可執行 `bash scripts/regression/verify-reference.sh`（對照使用已提交的 HEAD）；它只在暫存目錄下載經 SHA-256 驗證的工具，不變更 Agent 設定或教材工具鏈。詳見 [移植紀錄](docs/rust-port.md)。
 
-另有獨立 CI job 在沒有 node_modules 且阻擋 node/npm/npx 的 PATH 下執行 build、check、check-rust，Pages 發布也直接使用 Rust CLI。舊版只保留為測試對照。
+另有獨立 CI job 在沒有 node_modules 且阻擋 node/npm/npx 的 PATH 下執行 build、check、check-rust，Pages 發布也直接使用 Rust CLI。舊版只透過歷史 Git 提交提供測試對照。
 
 ## 專案位置
 
 | 位置 | 用途 |
 | --- | --- |
 | [content/](content/) | 教材 Markdown、章節路徑與來源索引 |
-| [src/](src/) | 舊版驗收對照、樣式和瀏覽器互動 |
+| [src/](src/) | 樣式和瀏覽器互動 |
 | [content/site-data.json](content/site-data.json) | 共用課程階段、SVG 圖示、互動圖解與測驗資料 |
 | [scripts/](scripts/) | 產生靜態頁面、檢查內容與 Rust 範例 |
 | [tools/lesson-check/](tools/lesson-check/) | Rust 原生教材建置前檢查器 |
@@ -76,3 +76,7 @@ Rust 工具統一使用 `tools/Cargo.toml` workspace、`tools/Cargo.lock` 與 `t
 正式 CLI 直接呼叫 `lesson_check`、`site_tools::search_index`、`site_tools::site_write`、`site_tools::site_preview` 函式庫；原本獨立工具的 CLI 保留作相容入口及行為重播，正式建置不再啟動子 Cargo 程序。渲染內部欄位直接傳入迭代器，只有舊版相容 stdin 介面需要 NUL 封包。
 
 教材執行器分離 stdout/stderr、限制每個輸出檔讀取量為 1 MiB、限制執行時間與子程序環境變數；Unix 逾時時會終止該子程序群組。它仍不是安全沙箱：不能阻止程式讀取檔案、連線或自行脫離程序群組，僅適用於可信任教材。
+
+### 獨立回歸與固定歷史參考
+
+`npm run test:regression` 驗證目前工作樹的 Rust 建置可重現、無效部署路徑拒絕並保留整棵產物、以及網站檢查器的八個負例。`scripts/regression/verify-reference.sh` 僅在 CI 或手動驗收時使用 Git 固定提交 `b2c5abe32610f6f098e46ec2501c9514fed2066d` 的舊 Node 參考程式，搭配目前 HEAD 的 Rust 工具、教材及資產；保留原有逐位元組與 rust-anything 重播證據。不要在現行原始碼重新加入另一套渲染器。若預期改變 HTML 契約，須以獨立回歸基準明確審核差異，而非靜默放寬比較。
