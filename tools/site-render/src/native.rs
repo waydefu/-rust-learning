@@ -7,9 +7,7 @@ use serde_json::{Value, json};
 use std::{
     collections::{BTreeMap, BTreeSet},
     env, fs,
-    io::Write,
     path::Path,
-    process::{Command, Stdio},
 };
 #[path = "native_check.rs"]
 mod check;
@@ -68,59 +66,11 @@ fn base_path() -> Result<String> {
     }
     Ok(b)
 }
-fn framed(mode: &str, n: usize, fields: &Fields) -> Result<String> {
-    if fields.iter().any(|f| f.contains('\0')) {
-        return Err("資料含 NUL".into());
-    }
-    Ok(format!("{mode}\0{n}\0{}\0", fields.join("\0")))
-}
 fn packet(mode: &str, n: usize, fields: Fields) -> Result<Vec<String>> {
     if fields.iter().any(|f| f.contains('\0')) {
         return Err("資料含 NUL".into());
     }
     process_fields(mode, n, fields.iter().map(String::as_str))
-}
-fn child_tool(
-    manifest: &str,
-    bin: Option<&str>,
-    args: &[&str],
-    input: Option<&str>,
-) -> Result<String> {
-    let cargo = env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
-    let mut command = Command::new(cargo);
-    command.args(["run", "--quiet", "--locked", "--manifest-path", manifest]);
-    if let Some(bin) = bin {
-        command.args(["--bin", bin]);
-    }
-    if !args.is_empty() {
-        command.arg("--").args(args);
-    }
-    command.stderr(Stdio::inherit());
-    if let Some(input) = input {
-        let mut child = command
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .spawn()
-            .map_err(fail)?;
-        child
-            .stdin
-            .take()
-            .ok_or("無法傳遞資料")?
-            .write_all(input.as_bytes())
-            .map_err(fail)?;
-        let result = child.wait_with_output().map_err(fail)?;
-        if !result.status.success() {
-            return Err(format!("原生工具失敗：{manifest} {bin:?}"));
-        }
-        String::from_utf8(result.stdout).map_err(fail)
-    } else {
-        let status = command.status().map_err(fail)?;
-        if status.success() {
-            Ok(String::new())
-        } else {
-            Err(format!("原生工具失敗：{manifest} {bin:?}"))
-        }
-    }
 }
 #[derive(Debug)]
 struct Entry {
@@ -504,12 +454,20 @@ impl Course {
             .iter()
             .map(|l| format!("content/{}.md", l.entry.slug))
             .collect();
-        child_tool(
-            "tools/lesson-check/Cargo.toml",
-            None,
-            &names.iter().map(String::as_str).collect::<Vec<_>>(),
-            None,
-        )?;
+        let mut total = 0;
+        let mut errors = Vec::new();
+        for name in &names {
+            match lesson_check::check_file(Path::new(name)) {
+                Ok(count) => total += count,
+                Err(messages) => {
+                    errors.extend(messages.into_iter().map(|message| format!("{name}: {message}")));
+                }
+            }
+        }
+        if !errors.is_empty() {
+            return Err(errors.join("\n"));
+        }
+        println!("Rust 教材檢查：{} 章、{total} 個教學方塊通過", names.len());
         Ok(())
     }
 }
@@ -833,24 +791,29 @@ fn render(course: &Course, base: &str) -> Result<(Vec<(String, String)>, Value)>
 fn build(course: &Course, base: &str) -> Result<()> {
     course.preflight()?;
     let (mut output, report) = render(course, base)?;
-    let mut fields = Vec::new();
-    for l in &course.lessons {
-        let e = &l.entry;
-        add(
-            &mut fields,
-            &[&e.title, &e.id, &e.description, &e.href(base), &l.full_text],
-        );
-        number(&mut fields, l.headings.len());
-        for (level, label, id) in &l.headings {
-            add(&mut fields, &[id, label, &level.to_string()]);
-        }
-    }
-    let search = child_tool(
-        "tools/site-tools/Cargo.toml",
-        Some("search-index"),
-        &[],
-        Some(&framed("rust-search-v1", course.lessons.len(), &fields)?),
-    )?;
+    let hrefs: Vec<_> = course.lessons.iter().map(|l| l.entry.href(base)).collect();
+    let lessons: Vec<_> = course
+        .lessons
+        .iter()
+        .zip(&hrefs)
+        .map(|(l, href)| site_tools::search_index::Lesson {
+            title: &l.entry.title,
+            id: &l.entry.id,
+            description: &l.entry.description,
+            href,
+            text: &l.full_text,
+            headings: l
+                .headings
+                .iter()
+                .map(|(level, label, id)| site_tools::search_index::Heading {
+                    id,
+                    label,
+                    level: *level,
+                })
+                .collect(),
+        })
+        .collect();
+    let search = site_tools::search_index::render(&lessons)?;
     output.extend([
         (".nojekyll".into(), String::new()),
         ("assets/search-index.json".into(), search),
@@ -863,16 +826,11 @@ fn build(course: &Course, base: &str) -> Result<()> {
             serde_json::to_string_pretty(&report).map_err(fail)?,
         ),
     ]);
-    let fields = output
+    let files: Vec<_> = output
         .iter()
-        .flat_map(|(p, s)| [p.clone(), s.clone()])
+        .map(|(path, text)| (path.as_str(), text.as_str()))
         .collect();
-    child_tool(
-        "tools/site-tools/Cargo.toml",
-        Some("site-write"),
-        &[],
-        Some(&framed("site-write-v1", output.len(), &fields)?),
-    )?;
+    site_tools::site_write::write_site(Path::new("."), &files).map_err(fail)?;
     println!(
         "Built {} HTML pages at {base} (Rust CLI, no Node)",
         pages(course).len()
@@ -927,13 +885,7 @@ pub(super) fn run(args: &[String]) -> Result<()> {
         "dev" => {
             build(&course, &base)?;
             check::check(&course, &base)?;
-            child_tool(
-                "tools/site-tools/Cargo.toml",
-                Some("site-preview"),
-                &["dist"],
-                None,
-            )
-            .map(|_| ())
+            site_tools::site_preview::serve(Path::new("dist")).map_err(fail)
         }
         _ => Err("未知指令；請使用 build、check、check-rust 或 dev".into()),
     }
