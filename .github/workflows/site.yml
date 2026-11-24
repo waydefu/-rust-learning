@@ -15,7 +15,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      REQUIRE_NATIVE_MARKDOWN: '1'
       VERIFY_SITE_WRITE: '1'
     steps:
       - uses: actions/checkout@v6
@@ -78,7 +77,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      REQUIRE_NATIVE_MARKDOWN: '1'
     permissions:
       contents: read
       pages: read

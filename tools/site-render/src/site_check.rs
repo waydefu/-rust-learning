@@ -141,7 +141,7 @@ pub(super) fn process_site_check<'a>(n:usize,f:&mut impl Iterator<Item=&'a str>,
     let mut has_rust=false;
     for i in 0..report_count{
         let slug=field(f)?;let renderer=field(f)?;
-        report_valid &= lessons.get(i).is_some_and(|l|l.slug==slug)&&matches!(renderer,"rust"|"legacy");
+        report_valid &= lessons.get(i).is_some_and(|l|l.slug==slug)&&renderer=="rust";
         has_rust |= renderer=="rust";
     }
     if !report_valid||!has_rust{errors.push("Rust 渲染報告不完整".into())}

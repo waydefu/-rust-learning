@@ -14,7 +14,7 @@ CommonMark 可以直接在 GitHub 與 HackMD 編輯。技術圖解使用同庫 S
 
 ### Rust 正文與 HTML 模板
 
-`tools/site-render` 使用鎖定版 pulldown-cmark 0.13.0（Rust 1.71.1 以上可編譯）解析 CommonMark，開啟表格與刪除線。Rust 接收原始 Markdown、現有章節錨點及高亮程式片段，檢查程式區塊內容與順序、標題層級，轉換教學方塊，拒絕不安全的 URL 並跳脫原始 HTML。Node 端以解析後 DOM 的標籤、屬性與文字（程式碼精確比對）作為相容性閘門，只有通過才替換正文；每篇回退都有可見報告，`REQUIRE_NATIVE_MARKDOWN=1` 可作為完整遷移的嚴格驗收。每個 HTML 文件的外層模板均由 Rust 產生，與原模板逐字比對，失敗則停止建置。
+`tools/site-render` 使用鎖定版 pulldown-cmark 0.13.0（Rust 1.71.1 以上可編譯）解析 CommonMark，開啟表格與刪除線。Rust 接收原始 Markdown、現有章節錨點及高亮程式片段，檢查程式區塊內容與順序、標題層級，轉換教學方塊，拒絕不安全的 URL 並跳脫原始 HTML。Node 端以解析後 DOM 的標籤、屬性與文字（程式碼精確比對）作為相容性閘門；任何正文或高亮差異均停止建置，成功報告記錄零回退。每個 HTML 文件的外層模板均由 Rust 產生，與原模板逐字比對，失敗則停止建置。
 
 目前仍需 Node.js，並且兩套渲染器在建置期有額外成本；網站送到瀏覽器的資源量不因這項過渡設計增加（另有獨立的建置報告，不會由一般閱讀流程下載）。沒有實測證據前，不宣稱全站已純 Rust 化或效能提升。
 
@@ -46,7 +46,7 @@ HackMD 同步教學也列出免費方案的同步次數限制。實際配額以�
 
 ## 來源與依賴
 
-pulldown-cmark 及其建置期依賴以 tools/site-render/Cargo.lock 鎖定。markdown-it 和 highlight.js 在 Node 建置期使用，由 npm 鎖檔固定版本。網站輸出包含兩者的授權文字。Playwright、axe 和 parse5 用於驗證。Rand 0.9.5（MIT 或 Apache-2.0）和 Tokio 1.54.1（MIT）僅用於編譯和執行教材範例，依賴固定在 Cargo.lock。原始教材的公開與授權條款由擁有者決定。 [Rand](https://crates.io/crates/rand/0.9.5) · [Tokio](https://crates.io/crates/tokio/1.54.1)
+pulldown-cmark 及其建置期依賴以 tools/site-render/Cargo.lock 鎖定。markdown-it 與 highlight.js 在 Node 建置期提供舊版相容性對照，由 npm 鎖檔固定版本。網站輸出包含兩者的授權文字。Playwright、axe 和 parse5 用於驗證。Rand 0.9.5（MIT 或 Apache-2.0）和 Tokio 1.54.1（MIT）僅用於編譯和執行教材範例，依賴固定在 Cargo.lock。原始教材的公開與授權條款由擁有者決定。 [Rand](https://crates.io/crates/rand/0.9.5) · [Tokio](https://crates.io/crates/tokio/1.54.1)
 
 ## 參考專案
 

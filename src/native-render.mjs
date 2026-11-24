@@ -89,10 +89,8 @@ export function renderNativeBodies(lessons) {
   }
   const fallback = report.filter(item => item.renderer !== 'rust');
   console.log('Rust Markdown 渲染相容：' + (report.length - fallback.length) + '/' + report.length);
-  for (const {slug, reason} of fallback) console.warn('保留既有渲染：' + slug + ' — ' + reason);
-  if (fallback.length === report.length || (fallback.length && process.env.REQUIRE_NATIVE_MARKDOWN === '1')) {
-    throw new Error('Rust Markdown 尚未達到指定相容性要求');
-  }
+  for (const {slug, reason} of fallback) console.error('Rust 正文差異：' + slug + ' — ' + reason);
+  if (fallback.length) throw new Error('Rust Markdown 必須零回退');
   const {blocks, ...highlight} = codeReport;
   return {markdown:report,highlight};
 }
