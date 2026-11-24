@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { catalog, chapters, md, projectRoot, readLesson } from '../src/course.mjs';
 import { makeSite } from '../src/site.mjs';
-import { applyNativeMetadata, applyNativeNavigation, renderNativeBodies, renderNativeLayouts } from '../src/native-render.mjs';
+import { applyNativeMetadata, applyNativeNavigation, applyNativeLanding, applyNativeReaders, applyNativePageData, applyNativeFences, renderNativeBodies, renderNativeLayouts } from '../src/native-render.mjs';
 
 const inputBase = process.env.BASE_PATH || '/';
 if (!/^\/(?:[\w.-]+\/)*[\w.-]*\/?$/.test(inputBase) || inputBase.startsWith('//') || inputBase.split('/').some(segment => ['.', '..'].includes(segment))) {
@@ -18,6 +18,7 @@ execFileSync(process.env.CARGO || 'cargo', [
 ], { cwd: projectRoot, stdio: 'inherit' });
 const lessons = await Promise.all(catalog.map(readLesson));
 applyNativeMetadata(lessons);
+applyNativeFences(lessons);
 const renderReport = renderNativeBodies(lessons);
 
 // Keep Markdown parsing in the existing renderer for now. Native Rust owns
@@ -46,6 +47,9 @@ const pagePaths = ['index.html', 'resources/index.html', '404.html', ...lessons.
 const specs = [nativeSite.home(), nativeSite.resourceIndex(), nativeSite.missing(), ...lessons.map(nativeSite.lesson)];
 const baseline = [site.home(), site.resourceIndex(), site.missing(), ...lessons.map(site.lesson)];
 applyNativeNavigation(base, specs);
+applyNativeLanding(base, specs);
+applyNativeReaders(base, specs.slice(3), lessons);
+applyNativePageData(base, specs, lessons);
 const pages = renderNativeLayouts(base, specs);
 for (let i = 0; i < pages.length; i++) {
   if (pages[i] !== baseline[i]) throw new Error('Rust 頁面模板與原版不一致：' + pagePaths[i]);
@@ -59,7 +63,7 @@ const generated = [
   ['assets/search-index.json', searchIndex],
   ['third-party-licenses.txt', (await Promise.all(['markdown-it','highlight.js'].map(async name =>
     name + '\n' + await readFile(join(projectRoot,'node_modules',name,'LICENSE'), 'utf8')))).join('\n\n')],
-  ['build-render-report.json', JSON.stringify({layout: 'rust', pages: pages.length, markdown: renderReport}, null, 2)],
+  ['build-render-report.json', JSON.stringify({layout: 'rust', pages: pages.length, markdown: renderReport.markdown, highlight: renderReport.highlight}, null, 2)],
 ];
 const fields = ['site-write-v1', String(generated.length), ...generated.flat()];
 if (fields.some(field => typeof field !== 'string' || field.includes('\0'))) {

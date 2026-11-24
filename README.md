@@ -4,7 +4,7 @@
 
 ## 本機使用
 
-建置網站需要 Node.js 24、Cargo 及 Rust 1.85.1（由 `rust-toolchain.toml` 指定）。Rust 原生工具驗證教材、產生章節標題與錨點、搜尋索引、側欄導覽、渲染 Markdown 與共用 HTML 頁面模板、寫入網站產物，並提供本機預覽。為了維持既有網站相容性，Node.js 仍提供舊渲染對照、語法高亮、部分頁面內容與互動元件。一般閱讀只需瀏覽器。
+建置網站需要 Node.js 24、Cargo 及 Rust 1.85.1（由 `rust-toolchain.toml` 指定）。Rust 原生工具驗證教材、產生章節標題與錨點、搜尋索引、側欄導覽、渲染 Markdown、全站頁面模板、互動資料、語法高亮，並執行教材範例、檢查網站產物、寫入網站及提供本機預覽。Node.js 仍負責資料解碼、解析橋接與舊版相容性對照；純 Rust 建置總入口屬下一階段。一般閱讀只需瀏覽器。
 
 ```sh
 npm ci
@@ -30,7 +30,7 @@ npm run test:browser
 
 ## 渲染相容性
 
-每次建置會將 Rust 正文與原本 Markdown 渲染的 DOM 比對。相容時使用 Rust 輸出，否則在終端與 `dist/build-render-report.json` 記錄原因並保留該篇舊正文；共用 HTML 文件模板一律由 Rust 生成，與原模板逐字比對。若要禁止正文回退，可設定 `REQUIRE_NATIVE_MARKDOWN=1` 執行建置。此過渡機制不是完全移除 Node.js 的宣告。
+每次建置都將 Rust 正文與原 Markdown DOM 比對，程式區塊、頁面模板及互動 JSON 逐字比對；任何不相符即停止建置，不回退到舊渲染器。成功的 `dist/build-render-report.json` 記錄各篇正文及各語言高亮相容率。此過渡機制不是完全移除 Node.js 的宣告。
 
 ## Rust 移植驗證
 
@@ -47,7 +47,7 @@ npm run test:browser
 | [scripts/](scripts/) | 產生靜態頁面、檢查內容與 Rust 範例 |
 | [tools/lesson-check/](tools/lesson-check/) | Rust 原生教材建置前檢查器 |
 | [tools/site-tools/](tools/site-tools/) | Rust 原生搜尋索引、網站產物寫入與本機 HTTP 預覽 |
-| [tools/site-render/](tools/site-render/) | Rust CommonMark 渲染與 HTML 文件模板 |
+| [tools/site-render/](tools/site-render/) | Rust CommonMark、高亮、全站模板、互動資料、範例執行器與網站驗證 |
 | [examples/](examples/) | 外部 crate 範例的 Cargo 設定與鎖檔。程式碼從教材抽取 |
 | [tests/](tests/) | Playwright 操作與 axe 無障礙檢查 |
 | [.github/workflows/site.yml](.github/workflows/site.yml) | Pull request 驗證與 Pages 部署 |

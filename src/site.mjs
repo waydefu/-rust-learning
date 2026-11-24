@@ -156,11 +156,13 @@ export function makeSite(base, {nativeLayout = false} = {}) {
       </article><aside class="desktop-toc"><nav aria-label="本章目錄"><h2>本章目錄</h2>${outline}</nav></aside></div>
       ${footer()}
     </div>`;
-    return layout({current:entry.path,id:entry.id,title:entry.title,description:entry.description,body,data:{
+    const spec = layout({current:entry.path,id:entry.id,title:entry.title,description:entry.description,body,data:{
       ...(isChapter ? {chapter:entry.id} : {}),
       ...(isOwnership ? {ownershipSteps} : {}),
       ...(quizzes[entry.slug] ? {answer:quizzes[entry.slug].answer} : {}),
     }});
+    if (nativeLayout) spec.reader = {stageTitle:stage?.title ?? '', labelIcon:icon(stage?.icon ?? 'book',17), intro:firstPart, rest};
+    return spec;
   }
 
   function missing() {

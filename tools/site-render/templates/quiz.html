@@ -1,0 +1,9 @@
+<section class="quiz" data-quiz="{{slug}}">
+    <p class="lab-kicker">{{icon}} 自我測驗</p>
+    <h2 id="quick-check" tabindex="-1">確認理解</h2>
+    <form><fieldset><legend>{{prompt}}</legend>
+    {{choices}}
+    </fieldset><button type="submit" class="button primary" hidden>檢查答案</button>
+    <p data-quiz-feedback role="status"></p></form>
+    <details class="answer"><summary>查看完整解析</summary><p><strong>{{answer}}</strong></p><p>{{explanation}}</p></details>
+  </section>

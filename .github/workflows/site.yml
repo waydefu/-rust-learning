@@ -15,7 +15,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      REQUIRE_NATIVE_MARKDOWN: '1'
       VERIFY_SITE_WRITE: '1'
     steps:
       - uses: actions/checkout@v6
@@ -41,10 +40,11 @@ jobs:
           path: .migration-evidence/
           include-hidden-files: true
           if-no-files-found: ignore
-      - run: npm run build && npm run check
-      - run: npm run check:rust
+      - run: npm run build && node scripts/migration/compare-site-check.mjs
+      - name: Rust 範例執行器與原版對照
+        run: node scripts/migration/compare-examples.mjs
       - run: npx playwright install --with-deps chromium
-      - run: npm run build && npm run check && npm run test:browser
+      - run: npm run build && node scripts/migration/compare-site-check.mjs && npm run test:browser
         env:
           BASE_PATH: /-rust-learning/
       - name: 驗證 Rust 本機預覽伺服器
@@ -76,8 +76,6 @@ jobs:
     needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    env:
-      REQUIRE_NATIVE_MARKDOWN: '1'
     permissions:
       contents: read
       pages: read
@@ -187,4 +185,4 @@ jobs:
           grep -Fq '.lesson-callout' /tmp/rust-site.css
           test -s /tmp/rust-site.css
           curl --fail --silent --show-error --retry 4 --retry-all-errors --retry-delay 2 --max-time 20 "$endpoint/build-render-report.json" -o /tmp/rust-render-report.json
-          jq -e '.layout == "rust" and .pages == 34 and (.markdown | length) == 31 and all(.markdown[]; .renderer == "rust")' /tmp/rust-render-report.json
+          jq -e '.layout == "rust" and .pages == 34 and (.markdown | length) == 31 and all(.markdown[]; .renderer == "rust") and .highlight.renderer == "rust" and .highlight.total > 0 and .highlight.native == .highlight.total and .highlight.fallback == 0' /tmp/rust-render-report.json

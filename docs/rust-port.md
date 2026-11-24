@@ -18,9 +18,9 @@
 | 共用 HTML 文件模板 | 已合併 | 34 頁逐字對照 |
 | Markdown 正文 | 31/31 已驗證、已部署 | CI 強制 31/31，禁止回退 |
 | 靜態產物寫入 | 已驗證、已部署 | rust-anything record/replay 與完整產物逐位元組對照 |
-| 章節標題元資料、Unicode 錨點 | Rust 實作待本輪 CI | 31 篇逐項比對、Unicode 邊界案例；catalog 讀取與搜尋全文尚在 JS |
-| 導覽、首頁、互動教材模板 | 側欄導覽 Rust 實作待 CI；首頁及互動模板尚未移植 | 34 頁 DOM 與瀏覽器測試 |
-| 語法高亮、範例抽取、網站檢查 | 未移植 | fenced code、診斷、測試與輸出契約 |
+| 章節標題元資料、Unicode 錨點 | 已驗證、已部署 | 31 篇逐項比對、Unicode 邊界案例；catalog 讀取與搜尋全文尚在 JS |
+| 導覽、首頁、互動教材模板 | 側欄導覽已部署；首頁、資源與互動模板 PR CI 通過 | 34 頁 DOM 與瀏覽器測試 |
+| 語法高亮、範例抽取、網站檢查 | 原生規則與執行器已提交；高亮零回退驗收以 PR #12 最新 CI 為準 | fenced code、診斷、測試與輸出契約 |
 | Rust CLI 總入口 | 未移植 | 完整 build/check/dev 行為錄製與重播 |
 
 ## 第一個 rust-anything 單元：site-write
@@ -45,4 +45,31 @@ Rust 直接從 Markdown 抽出 H1 及各節標題，以 Unicode NFKC、完整小
 
 Rust 生成 34 頁桌面與手機共用的課程側欄，逐字比對舊版導覽，再由 Rust 文件模板放入頁面。原 JS 模板暫留驗證；所有路由、學習進度、CSS 和瀏覽器腳本不變。現有 rust-anything 寫入器重播仍在 CI 中，本輪新增單元使用原版直接差異驗證，未聲稱已完成 rust-anything 全應用程式 lift。
 
-本輪實作、測試均待 CI；尚未合併、發布。
+PR #10 已合併；PR #11 拆分 Pages 產物上傳與部署 job，main `3d983a3` 的 [Actions](https://github.com/waydefu/-rust-learning/actions/runs/45379517169) 首次執行即成功，含線上版本檢查。
+
+## 第六至九階段：單一 PR #12
+
+基準 main `3d983a3` 已成功部署。依維護者要求，第六至九階段集中在 [PR #12](https://github.com/waydefu/-rust-learning/pull/12)，不拆分後續 PR。
+
+- 第六階段：Rust 生成首頁、延伸資源、404、四組課程階段、21 張章節卡片、8 張資源卡片及共用頁尾。
+- 第七階段：Rust 生成 31 頁閱讀正文外框、桌面及手機目錄、上下章導覽、網站章節索引、測驗、流程圖、所有權記憶體圖、完成區塊及 34 頁 page-data JSON。只接收結構化欄位、可信 SVG 與原生 Markdown 正文，不接收舊版頁面片段；瀏覽器 JS 不變。
+- 第八階段：Rust 自行掃描 Rust、Shell、TOML 與純文字，產生高亮、複製按鈕及程式區塊。參考 highlight.js 11.12.0 的公開語法契約。highlight-v2 只接收原始程式碼與可信 SVG，舊版 HTML 不進入 Rust，僅供比對。任何差異拒絕建置，報告記錄各語言原生採用率及 fallback=0。這是現有教材與回歸測試的契約，不代表支援所有可能的語法輸入。
+- 第九階段：Rust 從 Markdown 抽取 fenced code、驗證範例標注，接管 Rust 編譯、執行、預期診斷碼集合、Cargo 多檔案專案、逾時與暫存清理。Rust 網站驗證規則包含 catalog、來源檔案、標題層級、程式碼結尾、HTML 結構、教學方塊、站內連結與錨點、資源檔案、搜尋索引完整欄位與定位、渲染報告及 160 kB 預算。Node 保留 HTML5/URL/JSON 解碼及結構化資料橋接；不再執行正式檢查規則，舊執行器及檢查器只作 CI 對照。
+
+### 已取得的歷史證據
+
+| CI | 實際結果 |
+| --- | --- |
+| [#29](https://github.com/waydefu/-rust-learning/actions/runs/45380643836) | 125 段抽取、112 段 Rust 範例、10 瀏覽器測試、14/14 行為重播通過；高亮 6/125 |
+| [#30](https://github.com/waydefu/-rust-learning/actions/runs/45381146453) | 32 個 Rust 工具測試、原生執行器 112/112，與舊版統計一致 |
+| [#31](https://github.com/waydefu/-rust-learning/actions/runs/45381298048) | 原生網站檢查與舊版統計一致，完整 CI 通過 |
+| [#32](https://github.com/waydefu/-rust-learning/actions/runs/45381465052) | 高亮 116/125，完整 CI 通過 |
+| [#35](https://github.com/waydefu/-rust-learning/actions/runs/45382508912) | 124/125 高亮相容，首頁、資源與 404 三頁及 34 頁互動 JSON 比對通過，完整 CI 通過 |
+
+唯一剩餘高亮差異是 testing.md 的 `super::*`。後續提交補齊 namespace 規則，改成零回退契約。網站檢查器新增七個暫時破壞產物的負例，兩套檢查器都必須拒絕，finally 還原原始位元組。
+
+### 最終驗收條件
+
+根路徑與 Pages 子路徑都必須通過 31/31 原生正文、全部 fenced code 原生高亮零回退、34 頁完整 HTML 與互動資料逐字對照、全網站檢查、Rust 範例與舊版統計對照、負例、行為重播、瀏覽器與本機預覽驗證。以 PR #12 最新提交的 Actions 成功紀錄為準；PR 未合併前不宣稱正式部署。
+
+第十階段再整合純 Rust 建置總入口、消除 Node 的 catalog/搜尋全文/HTML5/URL/JSON 解析橋接，遷移圖示及互動資料來源，執行全應用程式行為驗證。現有 rust-anything 14 案僅為 writer 單元，不宣稱完成 app lift。

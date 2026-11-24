@@ -1,0 +1,23 @@
+<div class="home-page">
+    <div class="breadcrumb"><span>學習</span>{{chevron14}}<span aria-current="page">課程總覽</span></div>
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <div class="edition"><span></span> RUST 2024 EDITION</div>
+        <h1 id="hero-title">從第一行程式，<br><em>到真正理解 Rust。</em></h1>
+        <p>不必有程式設計經驗。從電腦如何執行第一行程式開始，跟著範例弄懂資料如何保存、程式為何出錯，再一步步寫出自己的工具。</p>
+        <div class="hero-actions"><a class="button primary" href="{{base}}{{first}}/" data-start>開始學習</a><a class="button hero-secondary" href="#learning-path">{{route}} 課程路線</a></div>
+        <div class="hero-meta"><span>{{book}} {{chapterCount}} 章課程</span><span>{{layers}} {{resourceCount}} 份延伸教材</span></div>
+      </div>
+      <div class="hero-figure"><img src="{{base}}assets/ownership.svg" width="448" height="296" alt="所有權移動示意。a 已移動，b 指向原本的四個堆積位元組。"></div>
+    </section>
+    <section class="progress-card" data-progress aria-labelledby="progress-title">
+      <span class="progress-icon">{{target}}</span>
+      <div class="progress-copy"><h2 id="progress-title">我的學習進度</h2><p data-progress-description>讀完教材並試做練習後，可以在這裡記下學習進度。</p></div>
+      <div class="progress-meter"><div><span data-progress-count>0 / {{chapterCount}} 章</span><strong data-progress-percent>0%</strong></div><progress value="0" max="{{chapterCount}}" aria-label="課程完成進度"></progress></div>
+      <a class="button outline resume-button" href="{{base}}{{first}}/" data-resume>前往第 1 章</a>
+    </section>
+    <section class="learning-path" id="learning-path" aria-labelledby="path-title">
+      <div class="section-head"><div><h2 id="path-title">學習路線</h2><p>由語法和記憶體打底，逐步走向系統實作。</p></div><a class="button outline" href="{{base}}guide/outline/">{{list}} 完整目錄</a></div>
+      {{stages}}
+    </section>
+    {{footer}}</div>

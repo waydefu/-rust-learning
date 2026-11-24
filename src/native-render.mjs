@@ -1,7 +1,8 @@
 import { execFileSync } from 'node:child_process';
 import { parseFragment } from 'parse5';
-import { md, projectRoot, renderTokens, resources, stages } from './course.mjs';
+import { md, projectRoot, renderTokens, chapters, resources, stages } from './course.mjs';
 import { icon } from './icons.mjs';
+import { flows, quizzes, ownershipSteps } from './learning-labs.mjs';
 import { isDeepStrictEqual } from 'node:util';
 
 function invoke(mode, count, fields) {
@@ -60,13 +61,15 @@ export const equivalentMarkup = (a, b) =>
 
 export function renderNativeBodies(lessons) {
   const fields = [];
+  const codeReport = applyNativeHighlighting(lessons);
+  let fenceIndex = 0;
   for (const lesson of lessons) {
     fields.push(lesson.source, String(lesson.headings.length));
     for (const h of lesson.headings) fields.push(String(h.level), h.id);
-    const fences = lesson.tokens.filter(token => token.type === 'fence');
+    const fences = lesson.nativeFences;
     fields.push(String(fences.length));
     for (const token of fences) {
-      fields.push(token.info.trim(), token.content, md.renderer.rules.fence([token], 0));
+      fields.push(token.info.trim(), token.content, codeReport.blocks[fenceIndex++]);
     }
   }
   const result = invoke('markdown-v1', lessons.length, fields);
@@ -86,11 +89,10 @@ export function renderNativeBodies(lessons) {
   }
   const fallback = report.filter(item => item.renderer !== 'rust');
   console.log('Rust Markdown 渲染相容：' + (report.length - fallback.length) + '/' + report.length);
-  for (const {slug, reason} of fallback) console.warn('保留既有渲染：' + slug + ' — ' + reason);
-  if (fallback.length === report.length || (fallback.length && process.env.REQUIRE_NATIVE_MARKDOWN === '1')) {
-    throw new Error('Rust Markdown 尚未達到指定相容性要求');
-  }
-  return report;
+  for (const {slug, reason} of fallback) console.error('Rust 正文差異：' + slug + ' — ' + reason);
+  if (fallback.length) throw new Error('Rust Markdown 必須零回退');
+  const {blocks, ...highlight} = codeReport;
+  return {markdown:report,highlight};
 }
 
 export function renderNativeLayouts(base, specs) {
@@ -163,4 +165,146 @@ export function applyNativeNavigation(base, specs) {
     specs[i].navigation = result[i];
   }
   console.log('Rust 導覽逐字比對：' + specs.length + ' 頁通過');
+}
+
+export function applyNativeLanding(base, specs) {
+  const fields = [base, icon('chevron',14), icon('route',18), icon('book',16),
+    icon('layers',16), icon('target',24), icon('list',17), icon('check',15), icon('chevron',15),
+    chapters[0].path, String(chapters.length), String(resources.length)];
+  for (const entry of resources) fields.push(entry.id, entry.path, entry.title, entry.description);
+  fields.push(String(stages.length));
+  for (const stage of stages) {
+    fields.push(stage.id, stage.title, stage.description, icon(stage.icon,22), String(stage.chapters.length));
+    for (const entry of stage.chapters) {
+      fields.push(entry.id, entry.path, entry.title, entry.description, String(entry.slug === 'ownership'));
+    }
+  }
+  const result = invoke('landing-v1', 3, fields);
+  if (result.length !== 3 || specs[0].current !== '' || specs[1].current !== 'resources' || specs[2].current !== '404') {
+    throw new Error('Rust 首頁與延伸資源回傳格式不一致');
+  }
+  for (let i=0; i<3; i++) {
+    if (result[i] !== specs[i].body) throw new Error('Rust 首頁模板與原版不一致：' + specs[i].current);
+    specs[i].body = result[i];
+  }
+  console.log('Rust 首頁、延伸資源與 404 模板逐字比對：3 頁通過');
+}
+
+export function applyNativeReaders(base, specs, lessons) {
+  const fields = [base, icon('chevron',14),icon('list',17),icon('check',17),icon('target',18),icon('layers',17),icon('chevron',16)];
+  fields.push(String(stages.length));
+  for (const stage of stages) {
+    fields.push(stage.title,String(stage.chapters.length));
+    for(const entry of stage.chapters)fields.push(entry.id,entry.path,entry.title);
+  }
+  for (let i=0; i<lessons.length; i++) {
+    const {entry,title,headings}=lessons[i], p=specs[i].reader;
+    fields.push(entry.slug,String(chapters.includes(entry)),String(resources.includes(entry)),entry.id,entry.title,title,entry.description,p.stageTitle,p.labelIcon,entry.source.id,p.intro,p.rest);
+    const toc=headings.filter(h=>h.level===2);
+    fields.push(String(toc.length),...toc.flatMap(h=>[h.id,h.label]));
+    const ownership=entry.slug==='ownership';
+    fields.push(String(ownership));
+    if (ownership) for (const step of ownershipSteps) fields.push(step.code,step.message);
+    const f=flows[entry.slug]; fields.push(String(Boolean(f)));
+    if (f) fields.push(f.title,f.caption,String(f.nodes.length),...f.nodes);
+    const q=quizzes[entry.slug]; fields.push(String(Boolean(q)));
+    if(q) fields.push(q.prompt,q.explanation,String(q.choices.length),String(q.answer),...q.choices);
+  }
+  const result=invoke('reader-v1',lessons.length,fields);
+  if(result.length!==specs.length) throw new Error('Rust 閱讀頁數量不一致');
+  for(let i=0;i<specs.length;i++){
+    if(result[i]!==specs[i].body) throw new Error('Rust 閱讀頁與原版不一致：'+specs[i].current);
+    specs[i].body=result[i];
+  }
+  console.log('Rust 閱讀頁及互動模板逐字比對：'+specs.length+' 頁通過');
+}
+
+export function applyNativeHighlighting(lessons) {
+  const locations=lessons.flatMap(lesson=>lesson.nativeFences.map(token=>({slug:lesson.entry.slug,token})));
+  const tokens=locations.map(item=>item.token);
+  const fields=[icon('copy',16),...tokens.flatMap(token=>[token.info.trim(),token.content])];
+  // The native renderer receives only source and trusted icon data, never the legacy HTML.
+  const blocks=invoke('highlight-v2',tokens.length,fields);
+  if(blocks.length!==tokens.length)throw new Error('Rust 程式區塊回傳數量不一致');
+  const byLanguage=new Map(), mismatches=[];
+  for(let i=0;i<tokens.length;i++){
+    const token=tokens[i],language=token.info.split(/\s+/)[0];
+    const stats=byLanguage.get(language)??{native:0,total:0};
+    stats.total++;byLanguage.set(language,stats);
+    const candidate=blocks[i],original=md.renderer.rules.fence([token],0);
+    if(candidate===original){stats.native++;continue;}
+    let at=0;
+    while(at<Math.min(candidate.length,original.length)&&candidate[at]===original[at])at++;
+    const location=locations[i].slug+':'+(token.map[0]+1);
+    mismatches.push(location+' '+token.info);
+    console.error('Rust 高亮差異 '+location+' '+token.info+' '+JSON.stringify({candidate:candidate.slice(Math.max(0,at-60),at+180),reference:original.slice(Math.max(0,at-60),at+180)}));
+  }
+  const native=tokens.length-mismatches.length;
+  console.log('Rust 高亮逐字相容：'+native+'/'+tokens.length);
+  console.log('Rust 高亮各語言：'+[...byLanguage].map(([lang,{native,total}])=>lang+' '+native+'/'+total).join('；'));
+  if(mismatches.length)throw new Error('Rust 高亮必須零回退：'+mismatches.join(', '));
+  return {blocks,renderer:'rust',native,total:tokens.length,fallback:0,byLanguage:Object.fromEntries(byLanguage)};
+}
+
+export function applyNativeFences(lessons) {
+  const original=lessons.map(lesson=>lesson.tokens.filter(token=>token.type==='fence'));
+  const fields=lessons.flatMap((lesson,i)=>[lesson.source,String(original[i].length)]);
+  const result=invoke('fences-v1',lessons.length,fields);
+  let cursor=0,total=0;
+  for(let i=0;i<lessons.length;i++){
+    const count=Number(result[cursor++]);
+    if(count!==original[i].length) throw new Error('Rust 範例數量不同：'+lessons[i].entry.slug);
+    lessons[i].nativeFences=original[i].map(token=>{
+      const info=result[cursor++],content=result[cursor++];
+      if(info!==token.info.trim()||content!==token.content) throw new Error('Rust 範例內容不同：'+lessons[i].entry.slug);
+      total++;
+      return {...token,info,content};
+    });
+  }
+  if(cursor!==result.length) throw new Error('Rust 範例回傳多餘欄位');
+  console.log('Rust 範例抽取與標注驗證：'+total+' 段逐字比對通過');
+}
+
+export function verifyNativeExamples(lessons) {
+  const fields=[];
+  for(const lesson of lessons){
+    fields.push(lesson.entry.slug,String(lesson.nativeFences.length));
+    for(const token of lesson.nativeFences) fields.push(String(token.map[0]+1),token.info,token.content);
+  }
+  const result=invoke('examples-v1',lessons.length,fields);
+  const [version,compiled,run,error,project,messageCount,...messages]=result;
+  if(![compiled,run,error,project,messageCount].every(x=>/^\d+$/.test(x))||messages.length!==Number(messageCount)){
+    throw new Error('Rust 範例執行器回傳格式不一致');
+  }
+  return {version,compiled:Number(compiled),run:Number(run),error:Number(error),project:Number(project),messages};
+}
+
+export function verifyNativeSite(pages, fields) {
+  const result=invoke('site-check-v1',pages,fields);
+  if(result.length!==4||result.some(value=>!/^\d+$/.test(value)))throw new Error('Rust 網站驗證回傳格式不一致');
+  return result.map(Number);
+}
+
+export function applyNativePageData(base,specs,lessons) {
+  const fields=[base,String(chapters.length),...chapters.flatMap(e=>[e.id,e.path])];
+  const entries=new Map(lessons.map(l=>[l.entry.path,l.entry]));
+  for(const spec of specs){
+    const entry=entries.get(spec.current);
+    const chapter=entry&&chapters.includes(entry)?entry.id:'';
+    const ownership=entry?.slug==='ownership';
+    fields.push(chapter,String(ownership));
+    if(ownership){
+      fields.push(String(ownershipSteps.length));
+      for(const s of ownershipSteps)fields.push(s.code,s.source,s.target,s.owner??'',s.borrowed===undefined?'':String(s.borrowed),s.message);
+    }
+    const quiz=quizzes[entry?.slug];
+    fields.push(quiz?String(quiz.answer):'');
+  }
+  const result=invoke('page-data-v1',specs.length,fields);
+  if(result.length!==specs.length)throw new Error('Rust page-data 數量不一致');
+  for(let i=0;i<specs.length;i++){
+    if(result[i]!==specs[i].pageData)throw new Error('Rust page-data 與原版不一致：'+specs[i].current);
+    specs[i].pageData=result[i];
+  }
+  console.log('Rust 互動資料 JSON 逐字比對：'+specs.length+' 頁通過');
 }
