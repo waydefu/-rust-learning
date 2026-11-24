@@ -3,6 +3,9 @@
 use pulldown_cmark::{html, CodeBlockKind, CowStr, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 use std::{collections::HashMap, io::{self, Read, Write}, process::ExitCode};
 
+mod metadata;
+mod navigation;
+
 type Result<T> = std::result::Result<T, String>;
 const LIMIT: u64 = 64 * 1024 * 1024;
 const KINDS: [&str; 5] = ["context", "analogy", "walkthrough", "warning", "practice"];
@@ -200,6 +203,9 @@ fn process(input: &str) -> Result<Vec<u8>> {
     emit(&mut result, mode)?;
     emit(&mut result, &n.to_string())?;
     match mode {
+        "metadata-v1" => metadata::process_metadata(n, &mut fields, &mut result)?,
+        "anchors-v1" => metadata::process_anchors(n, &mut fields, &mut result)?,
+        "navigation-v1" => navigation::process_navigation(n, &mut fields, &mut result)?,
         "markdown-v1" => {
             for _ in 0..n {
                 let source = field(&mut fields)?;

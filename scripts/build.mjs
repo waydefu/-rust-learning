@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { catalog, chapters, md, projectRoot, readLesson } from '../src/course.mjs';
 import { makeSite } from '../src/site.mjs';
-import { renderNativeBodies, renderNativeLayouts } from '../src/native-render.mjs';
+import { applyNativeMetadata, applyNativeNavigation, renderNativeBodies, renderNativeLayouts } from '../src/native-render.mjs';
 
 const inputBase = process.env.BASE_PATH || '/';
 if (!/^\/(?:[\w.-]+\/)*[\w.-]*\/?$/.test(inputBase) || inputBase.startsWith('//') || inputBase.split('/').some(segment => ['.', '..'].includes(segment))) {
@@ -17,6 +17,7 @@ execFileSync(process.env.CARGO || 'cargo', [
   ...chapters.map(entry => 'content/' + entry.slug + '.md'),
 ], { cwd: projectRoot, stdio: 'inherit' });
 const lessons = await Promise.all(catalog.map(readLesson));
+applyNativeMetadata(lessons);
 const renderReport = renderNativeBodies(lessons);
 
 // Keep Markdown parsing in the existing renderer for now. Native Rust owns
@@ -44,6 +45,7 @@ const nativeSite = makeSite(base, {nativeLayout: true});
 const pagePaths = ['index.html', 'resources/index.html', '404.html', ...lessons.map(l => l.entry.path + '/index.html')];
 const specs = [nativeSite.home(), nativeSite.resourceIndex(), nativeSite.missing(), ...lessons.map(nativeSite.lesson)];
 const baseline = [site.home(), site.resourceIndex(), site.missing(), ...lessons.map(site.lesson)];
+applyNativeNavigation(base, specs);
 const pages = renderNativeLayouts(base, specs);
 for (let i = 0; i < pages.length; i++) {
   if (pages[i] !== baseline[i]) throw new Error('Rust 頁面模板與原版不一致：' + pagePaths[i]);

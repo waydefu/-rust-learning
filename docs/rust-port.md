@@ -16,10 +16,10 @@
 | --- | --- | --- |
 | 教材預檢、搜尋索引、本機預覽 | 已合併 | 原生測試、既有 CI |
 | 共用 HTML 文件模板 | 已合併 | 34 頁逐字對照 |
-| Markdown 正文 | 30/31 已驗證；剩餘差異已提交修正 | CI 強制 31/31，禁止回退 |
-| 靜態產物寫入 | Rust 實作已提交，待 CI | rust-anything record/replay 與完整產物逐位元組對照 |
-| 章節元資料、Unicode 錨點 | 未移植 | 固定現有資料與 Unicode 邊界案例 |
-| 導覽、首頁、互動教材模板 | 未移植 | 34 頁 DOM 與瀏覽器測試 |
+| Markdown 正文 | 31/31 已驗證、已部署 | CI 強制 31/31，禁止回退 |
+| 靜態產物寫入 | 已驗證、已部署 | rust-anything record/replay 與完整產物逐位元組對照 |
+| 章節標題元資料、Unicode 錨點 | Rust 實作待本輪 CI | 31 篇逐項比對、Unicode 邊界案例；catalog 讀取與搜尋全文尚在 JS |
+| 導覽、首頁、互動教材模板 | 側欄導覽 Rust 實作待 CI；首頁及互動模板尚未移植 | 34 頁 DOM 與瀏覽器測試 |
 | 語法高亮、範例抽取、網站檢查 | 未移植 | fenced code、診斷、測試與輸出契約 |
 | Rust CLI 總入口 | 未移植 | 完整 build/check/dev 行為錄製與重播 |
 
@@ -36,3 +36,13 @@
 5. VERIFY_SITE_WRITE=1 對根路徑與 Pages 子路徑生成的完整網站樹逐檔比對原版 writer。不是整個建置器已純 Rust 的證據。
 
 本輪不執行 app lift：它需要完整入口與所有單元通過，尚未達成。不得將測試尚未執行、或僅有移植程式碼提交，記為已完成驗收。
+
+## 第五階段：標題、錨點及導覽
+
+新基準 `0e45188a8ddfb7b286d546a9ff7e9ca3e0ede9f0` 的 [main CI 第二次執行](https://github.com/waydefu/-rust-learning/actions/runs/45376847485) 完成發布與線上驗證。上一輪 14/14 原版及 Rust 重播、31/31 正文、43 個輸出檔案比對、112 段 Rust 範例及 9 個瀏覽器測試通過。
+
+Rust 直接從 Markdown 抽出 H1 及各節標題，以 Unicode NFKC、完整小寫、General Category 的 Letter/Number 篩選與每篇重複計數生成錨點。固定依賴版本與 crates.io checksum，保留原 JS 計算為相容性基準；任何標題、層級或錨點差異都停止建置。Unicode 測試包含全形、組合字、Greek final sigma、Emoji、非 ASCII 字母、重複和空標題。保留既有重複錨點演算法，不聲稱已修復所有可能的後綴碰撞。Node 仍提供原 Markdown token offset、catalog JSON 讀取、搜尋全文。
+
+Rust 生成 34 頁桌面與手機共用的課程側欄，逐字比對舊版導覽，再由 Rust 文件模板放入頁面。原 JS 模板暫留驗證；所有路由、學習進度、CSS 和瀏覽器腳本不變。現有 rust-anything 寫入器重播仍在 CI 中，本輪新增單元使用原版直接差異驗證，未聲稱已完成 rust-anything 全應用程式 lift。
+
+本輪實作、測試均待 CI；尚未合併、發布。

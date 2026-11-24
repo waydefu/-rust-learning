@@ -30,7 +30,7 @@ export function makeSite(base, {nativeLayout = false} = {}) {
 
   function layout({current, id = '', title, description, body, data = {}}) {
     if (nativeLayout) return {
-      title, description, navigation: navigation(current,id), body,
+      current, id, title, description, navigation: navigation(current,id), body,
       pageData: safeJSON({base, chapterPaths: chapters.map(entry => [entry.id, entry.path]), ...data}),
     };
     return `<!doctype html>

@@ -4,7 +4,7 @@
 
 ## 本機使用
 
-建置網站需要 Node.js 24、Cargo 及 Rust 1.85.1（由 `rust-toolchain.toml` 指定）。Rust 原生工具驗證教材、產生搜尋索引、渲染 Markdown 與共用 HTML 頁面模板，並提供本機預覽。為了維持既有網站相容性，Node.js 仍提供舊渲染對照、語法高亮、部分頁面內容與互動元件。一般閱讀只需瀏覽器。
+建置網站需要 Node.js 24、Cargo 及 Rust 1.85.1（由 `rust-toolchain.toml` 指定）。Rust 原生工具驗證教材、產生章節標題與錨點、搜尋索引、側欄導覽、渲染 Markdown 與共用 HTML 頁面模板、寫入網站產物，並提供本機預覽。為了維持既有網站相容性，Node.js 仍提供舊渲染對照、語法高亮、部分頁面內容與互動元件。一般閱讀只需瀏覽器。
 
 ```sh
 npm ci
