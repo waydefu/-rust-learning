@@ -1,5 +1,7 @@
 //! Native sidebar renderer. Icons are trusted static SVG from the icon library.
-use super::{Result, count, emit, escape, field};
+use super::escape;
+#[cfg(feature = "migration-compat")]
+use super::{Result, count, emit, field};
 
 pub(super) struct Chapter<'a> {
     pub(super) id: &'a str,
@@ -12,6 +14,7 @@ pub(super) struct Stage<'a> {
     pub(super) chapters: Vec<Chapter<'a>>,
 }
 
+#[cfg(feature = "migration-compat")]
 fn safe_path(s: &str) -> bool {
     !s.is_empty()
         && s.split('/').all(|p| {
@@ -79,6 +82,7 @@ pub(super) fn navigation(
         )
     )
 }
+#[cfg(feature = "migration-compat")]
 pub(super) fn process_navigation<'a>(
     n: usize,
     fields: &mut impl Iterator<Item = &'a str>,

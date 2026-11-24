@@ -5,7 +5,7 @@ import { projectRoot } from './support/course.mjs';
 function nativeAnchors(groups) {
   const fields = ['anchors-v1', String(groups.length), ...groups.flatMap(labels => [String(labels.length), ...labels])];
   const output = execFileSync(process.env.CARGO || 'cargo', [
-    'run', '--quiet', '--locked', '--manifest-path', 'tools/site-render/Cargo.toml',
+    'run', '--quiet', '--locked', '--features', 'migration-compat', '--manifest-path', 'tools/site-render/Cargo.toml',
   ], { cwd: projectRoot, input: fields.join('\0') + '\0', encoding:'utf8', maxBuffer:1024*1024 });
   const result = output.split('\0');
   if (result.pop() !== '' || result.shift() !== 'anchors-v1' || result.shift() !== String(groups.length)) {

@@ -1,6 +1,8 @@
 //! Execute trusted, checked-in Rust lesson examples in a temporary working directory.
 //! This is not an OS sandbox; never run unreviewed snippets with local credentials.
-use super::{Result, count, emit, field};
+use super::Result;
+#[cfg(feature = "migration-compat")]
+use super::{count, emit, field};
 use std::{
     collections::{BTreeMap, BTreeSet},
     env, fs, io,
@@ -438,6 +440,7 @@ pub(super) struct Report {
     pub messages: Vec<String>,
 }
 
+#[cfg(feature = "migration-compat")]
 pub(super) fn process_examples<'a>(
     n: usize,
     f: &mut impl Iterator<Item = &'a str>,

@@ -5,6 +5,7 @@ use pulldown_cmark::{
 };
 use std::{collections::HashMap, process::ExitCode};
 
+#[cfg(feature = "migration-compat")]
 mod compat;
 mod examples;
 mod fences;
@@ -18,6 +19,7 @@ mod reader;
 mod schema;
 mod site_check;
 
+#[cfg(feature = "migration-compat")]
 use compat::{count, emit, field};
 
 type Result<T> = std::result::Result<T, String>;
@@ -290,7 +292,14 @@ fn layout(
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let result = if args.is_empty() {
-        compat::run().map_err(|e| e.to_string())
+        #[cfg(feature = "migration-compat")]
+        {
+            compat::run().map_err(|e| e.to_string())
+        }
+        #[cfg(not(feature = "migration-compat"))]
+        {
+            Err("使用方式：site-render build | check | check-rust | dev".into())
+        }
     } else {
         native::run(&args)
     };

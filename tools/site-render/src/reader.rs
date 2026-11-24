@@ -1,5 +1,7 @@
 //! Native reader and interactive templates. Trusted Markdown fragments are supplied by the bridge.
-use super::{Result, count, emit, escape, field, render_template};
+use super::{Result, escape, render_template};
+#[cfg(feature = "migration-compat")]
+use super::{count, emit, field};
 use std::collections::HashMap;
 fn fill(t: &str, v: &[(&str, &str)]) -> Result<String> {
     render_template(
@@ -9,6 +11,7 @@ fn fill(t: &str, v: &[(&str, &str)]) -> Result<String> {
             .collect::<HashMap<_, _>>(),
     )
 }
+#[cfg(feature = "migration-compat")]
 fn flag<'a>(f: &mut impl Iterator<Item = &'a str>) -> Result<bool> {
     match field(f)? {
         "true" => Ok(true),
@@ -27,6 +30,7 @@ pub(super) struct Quiz<'a> {
     pub choices: Vec<&'a str>,
     pub answer: usize,
 }
+#[cfg(feature = "migration-compat")]
 fn read_quiz<'a>(f: &mut impl Iterator<Item = &'a str>) -> Result<Option<Quiz<'a>>> {
     if !flag(f)? {
         return Ok(None);
@@ -80,6 +84,7 @@ pub(super) struct Flow<'a> {
     pub caption: &'a str,
     pub nodes: Vec<&'a str>,
 }
+#[cfg(feature = "migration-compat")]
 fn read_flow<'a>(f: &mut impl Iterator<Item = &'a str>) -> Result<Option<Flow<'a>>> {
     if !flag(f)? {
         return Ok(None);
@@ -112,6 +117,7 @@ fn flow(data: Option<&Flow<'_>>, icon: &str) -> Result<String> {
     )
 }
 type Ownership<'a> = [(&'a str, &'a str); 4];
+#[cfg(feature = "migration-compat")]
 fn read_ownership<'a>(f: &mut impl Iterator<Item = &'a str>) -> Result<Option<Ownership<'a>>> {
     if !flag(f)? {
         return Ok(None);
@@ -238,6 +244,7 @@ fn outline(toc: &[(&str, &str)], chapter: bool, ownership: bool) -> String {
     out
 }
 
+#[cfg(feature = "migration-compat")]
 pub(super) fn process_reader<'a>(
     n: usize,
     f: &mut impl Iterator<Item = &'a str>,
@@ -445,16 +452,23 @@ mod tests {
     use super::*;
     #[test]
     fn quiz_checks_answers_and_escapes() {
-        let fields = ["true", "<問>", "&答", "2", "1", "A", "B"];
-        let data = read_quiz(&mut fields.into_iter()).unwrap();
-        let html = quiz(data.as_ref(), "test", "").unwrap();
+        let data = Quiz {
+            prompt: "<問>",
+            explanation: "&答",
+            choices: vec!["A", "B"],
+            answer: 1,
+        };
+        let html = quiz(Some(&data), "test", "").unwrap();
         assert!(html.contains("&lt;問&gt;"));
         assert!(html.contains("<strong>B</strong>"));
         assert!(
             quiz(
-                read_quiz(&mut ["true", "Q", "E", "1", "1", "A"].into_iter())
-                    .unwrap()
-                    .as_ref(),
+                Some(&Quiz {
+                    prompt: "Q",
+                    explanation: "E",
+                    choices: vec!["A"],
+                    answer: 1,
+                }),
                 "test",
                 ""
             )

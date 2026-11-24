@@ -1,5 +1,7 @@
 //! Extract and validate fenced examples from the original Markdown.
-use super::{Result, count, emit, field};
+use super::Result;
+#[cfg(feature = "migration-compat")]
+use super::{count, emit, field};
 use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
 
 fn name(s: &str) -> bool {
@@ -66,6 +68,7 @@ pub(super) fn extract(source: &str) -> Result<Vec<(String, String)>> {
     }
     Ok(result)
 }
+#[cfg(feature = "migration-compat")]
 pub(super) fn process_fences<'a>(
     n: usize,
     f: &mut impl Iterator<Item = &'a str>,

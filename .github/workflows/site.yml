@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: site-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   verify:
     name: 教材與網站驗證
@@ -29,6 +33,7 @@ jobs:
       - run: npm audit --audit-level=high
       - run: rustup show
       - run: cargo test --locked --workspace --manifest-path tools/Cargo.toml
+      - run: cargo test --locked --workspace --all-features --manifest-path tools/Cargo.toml
       - name: 固定歷史版本對照與 Rust-anything 行為重播
         shell: bash
         run: bash scripts/regression/verify-reference.sh
@@ -142,6 +147,7 @@ jobs:
         shell: bash
         run: |
           cargo clippy --locked --workspace --manifest-path tools/Cargo.toml --all-targets -- -D warnings
+          cargo clippy --locked --workspace --all-features --manifest-path tools/Cargo.toml --all-targets -- -D warnings
       - name: RustSec 依賴掃描
         shell: bash
         run: |

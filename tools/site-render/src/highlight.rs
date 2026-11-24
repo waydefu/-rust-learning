@@ -1,6 +1,8 @@
 //! Native candidate highlighting. The bridge only selects exact reference matches.
 //! Rust grammar behavior is compared against highlight.js 11.12.0 (BSD-3-Clause).
-use super::{Result, emit, escape, field};
+use super::escape;
+#[cfg(feature = "migration-compat")]
+use super::{Result, emit, field};
 
 fn escaped(text: &str) -> String {
     escape(text).replace("&#39;", "&#x27;")
@@ -567,6 +569,7 @@ pub(super) fn block(info: &str, highlighted: &str, icon: &str) -> String {
         escape(language)
     )
 }
+#[cfg(feature = "migration-compat")]
 pub(super) fn process_highlight<'a>(
     n: usize,
     f: &mut impl Iterator<Item = &'a str>,

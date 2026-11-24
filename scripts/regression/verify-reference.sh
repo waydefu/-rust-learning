@@ -28,6 +28,9 @@ git archive "$pin" src scripts tests package.json package-lock.json playwright.c
 # Replace historical assets, tools and content with the current committed sources.
 rm -rf -- "$reference/src/assets"
 git archive HEAD tools content examples src/assets rust-toolchain.toml | tar -x -C "$reference"
+# Only the isolated historical oracle needs the retired stdin protocol.
+sed -i 's/^default = \[\]$/default = ["migration-compat"]/' "$reference/tools/site-render/Cargo.toml"
+grep -Fxq 'default = ["migration-compat"]' "$reference/tools/site-render/Cargo.toml"
 (
   cd "$reference"
   npm ci

@@ -1,5 +1,7 @@
 //! Native landing pages; the old JavaScript templates are the exact-output oracle.
-use super::{Result, count, emit, escape, field, render_template};
+use super::{Result, escape, render_template};
+#[cfg(feature = "migration-compat")]
+use super::{count, emit, field};
 use std::collections::{HashMap, HashSet};
 
 const HOME: &str = include_str!("../templates/home.html");
@@ -53,6 +55,7 @@ pub(super) struct Landing<'a> {
     pub stages: Vec<Stage<'a>>,
 }
 
+#[cfg(feature = "migration-compat")]
 fn read_entry<'a>(fields: &mut impl Iterator<Item = &'a str>, resource: bool) -> Result<Entry<'a>> {
     let entry = Entry {
         id: field(fields)?,
@@ -108,6 +111,7 @@ fn card(
     )
 }
 
+#[cfg(feature = "migration-compat")]
 pub(super) fn process_landing<'a>(
     n: usize,
     fields: &mut impl Iterator<Item = &'a str>,
@@ -312,6 +316,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "migration-compat")]
     #[test]
     fn renders_landing_and_checks_counts() {
         let fields = [

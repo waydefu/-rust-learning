@@ -1,11 +1,14 @@
 //! Site verification over normalized HTML and URL facts from the HTML5 parser.
 //! The native collector and the historical adapter share one typed verifier.
-use super::{Result, count, emit, field};
+use super::Result;
+#[cfg(feature = "migration-compat")]
+use super::{count, emit, field};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
     path::{Component, Path},
 };
+#[cfg(feature = "migration-compat")]
 fn flag<'a>(f: &mut impl Iterator<Item = &'a str>) -> Result<bool> {
     match field(f)? {
         "true" => Ok(true),
@@ -13,6 +16,7 @@ fn flag<'a>(f: &mut impl Iterator<Item = &'a str>) -> Result<bool> {
         _ => Err("網站驗證旗標無效".into()),
     }
 }
+#[cfg(feature = "migration-compat")]
 fn strings<'a>(f: &mut impl Iterator<Item = &'a str>, limit: usize) -> Result<Vec<&'a str>> {
     (0..count(f, limit)?).map(|_| field(f)).collect()
 }
@@ -112,6 +116,7 @@ pub(super) struct IndexEntry<'a> {
     pub text: &'a str,
     pub headings: Vec<(&'a str, &'a str)>,
 }
+#[cfg(feature = "migration-compat")]
 fn read_index<'a>(f: &mut impl Iterator<Item = &'a str>) -> Result<Vec<IndexEntry<'a>>> {
     let mut entries = Vec::new();
     for _ in 0..count(f, 1000)? {
@@ -133,6 +138,7 @@ fn read_index<'a>(f: &mut impl Iterator<Item = &'a str>) -> Result<Vec<IndexEntr
     Ok(entries)
 }
 
+#[cfg(feature = "migration-compat")]
 pub(super) fn process_site_check<'a>(
     n: usize,
     f: &mut impl Iterator<Item = &'a str>,

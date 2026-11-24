@@ -1,4 +1,6 @@
 //! Serialize the browser page-data contract without accepting pre-rendered JSON.
+
+#[cfg(feature = "migration-compat")]
 use super::{Result, count, emit, field};
 use std::fmt::Write as _;
 fn string(out: &mut String, s: &str) {
@@ -26,6 +28,7 @@ fn property(out: &mut String, key: &str, value: &str) {
     out.push(':');
     string(out, value)
 }
+#[cfg(feature = "migration-compat")]
 fn flag<'a>(f: &mut impl Iterator<Item = &'a str>) -> Result<bool> {
     match field(f)? {
         "true" => Ok(true),
@@ -101,10 +104,12 @@ pub(super) fn render(base: &str, paths: &[(&str, &str)], data: &PageData<'_>) ->
     page
 }
 
+#[cfg(feature = "migration-compat")]
 fn optional(value: &str) -> Option<&str> {
     (!value.is_empty()).then_some(value)
 }
 
+#[cfg(feature = "migration-compat")]
 pub(super) fn process_data<'a>(
     n: usize,
     f: &mut impl Iterator<Item = &'a str>,

@@ -1,5 +1,7 @@
 //! Stable heading metadata: preserve the existing JavaScript anchor contract.
-use super::{Result, count, emit, field};
+use super::Result;
+#[cfg(feature = "migration-compat")]
+use super::{count, emit, field};
 use pulldown_cmark::{Event, Options, Parser, Tag, TagEnd};
 use std::collections::HashMap;
 use unicode_general_category::{GeneralCategory as G, get_general_category};
@@ -102,6 +104,7 @@ pub(super) fn headings(source: &str) -> Result<HeadingMetadata> {
             .collect(),
     ))
 }
+#[cfg(feature = "migration-compat")]
 pub(super) fn process_metadata<'a>(
     n: usize,
     fields: &mut impl Iterator<Item = &'a str>,
@@ -119,6 +122,7 @@ pub(super) fn process_metadata<'a>(
     }
     Ok(())
 }
+#[cfg(feature = "migration-compat")]
 pub(super) fn process_anchors<'a>(
     n: usize,
     fields: &mut impl Iterator<Item = &'a str>,
