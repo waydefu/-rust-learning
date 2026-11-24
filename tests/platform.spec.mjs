@@ -235,3 +235,23 @@ test('interactive Vec capacity, race and Future models explain state', async ({p
   await lab.getByRole('button',{name:'poll()'}).click();
   await expect(lab.getByRole('status')).toContainText('Ready(42)');
 });
+
+
+test('iterator laziness and Rc reference count are observable', async ({page}) => {
+  await page.goto(target('chapters/iterators/'));
+  let lab=page.locator('[data-concept-lab="iterator"]');
+  await lab.getByRole('button',{name:'建立 filter'}).click();
+  await expect(lab.getByRole('status')).toContainText('尚未走訪元素');
+  await lab.getByRole('button',{name:'建立 map'}).click();
+  await lab.getByRole('button',{name:'collect()'}).click();
+  await expect(lab.getByRole('status')).toContainText('[20, 40]');
+  await page.goto(target('chapters/smart-pointers/'));
+  lab=page.locator('[data-concept-lab="rc"]');
+  await lab.getByRole('button',{name:'Rc::clone'}).click();
+  await expect(lab.getByRole('status')).toContainText('strong_count = 2');
+  await lab.getByRole('button',{name:'drop 一個 Rc'}).click();
+  await expect(lab.getByRole('status')).toContainText('保留資料');
+  await lab.getByRole('button',{name:'drop 一個 Rc'}).click();
+  await expect(lab.getByRole('status')).toContainText('內容被清理');
+  await expect(lab.getByRole('button',{name:'Rc::clone'})).toBeDisabled();
+});

@@ -21,6 +21,7 @@ fn main() {
     let n = Box::new(123);
     println!("{}", *n);
 }
+// 預期輸出: 123
 ```
 
 Box<T> 具有 T 的所有權，通常將 T 放在堆積，Box 值本身保存管理它的指標。離開作用域時會釋放它所擁有的資源。*n 是解參考。
@@ -50,6 +51,7 @@ Deref trait 定義如何從智慧指標取得所指向值的參考。Rust 在符
 fn greet(s: &str) { println!("{s}"); }
 let owned = Box::new(String::from("hello"));
 greet(&owned);
+// 預期輸出: hello
 ```
 
 ## 五、Drop：為何資源可自動清理？
@@ -63,6 +65,7 @@ use std::rc::Rc;
 let a = Rc::new(String::from("shared"));
 let b = Rc::clone(&a);
 println!("{} {}", a, b);
+// 預期輸出: shared shared
 ```
 
 Rc 記錄強參考計數，最後一個強擁有者離開後才釋放內容；Rc::clone 主要增加引用計數，不是 clone 內層 String。Rc 用於單執行緒情境，不能拿去跨執行緒當作 Arc 替身。
@@ -74,6 +77,7 @@ use std::cell::RefCell;
 let score = RefCell::new(3);
 *score.borrow_mut() += 1;
 println!("{}", score.borrow());
+// 預期輸出: 4
 ```
 
 RefCell 允許透過共享外觀取得可變借用，但在執行時檢查「多個不可變借用或一個可變借用」規則；違反時 borrow / borrow_mut 會 panic，try_borrow 系列則回傳 Result。

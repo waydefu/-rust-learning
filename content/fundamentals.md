@@ -26,6 +26,7 @@ fn main() {
     hp -= 20;
     println!("level={level}, hp={hp}");
 }
+// 預期輸出: level=2, hp=80
 ```
 
 let 預設不可變：防止一個值在沒有心理準備時被修改，降低追蹤狀態的難度。let mut 才允許對同一變數指派。再次 let x 是遮蔽（shadowing），建立新的綁定，甚至可以改變型別；不是將原本的 immutable 偷偷改掉。
