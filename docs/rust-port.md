@@ -100,3 +100,7 @@ CI 的臨時 Cargo metadata 診斷（run 45398892481）實際產生鎖檔差異�
 ## PR #15：架構清理與固定參考
 
 前端改成職責分離的 ES modules 與獨立動效/實驗室樣式；Rust 工具統一 workspace，正式流程直接呼叫函式庫；移植協定只留作固定參考相容入口。依賴 scraper 0.25.0 經 Cargo 實際解析移除 fxhash。歷史 Node 原始碼移出目前工作樹，保留在已全綠的 `b2c5abe32610f6f098e46ec2501c9514fed2066d`（[Actions](https://github.com/waydefu/-rust-learning/actions/runs/45400927384)）；`scripts/regression/verify-reference.sh` 在暫存目錄取出固定參考，搭配目前 HEAD 的 Rust 工具和內容，執行原有完整產物、負例及 rust-anything 重播。另有獨立 `check-native.mjs` 驗證可重現性與拒絕無效輸入。不宣稱固定參考能證明所有未來新輸入，也不在未確認的新 CI 上宣稱通過。
+
+### 型別化原生流程
+
+導覽、首頁、閱讀頁（教材分類、測驗、流程、所有權）、頁面資料、範例報告與網站驗證均改用具名 Rust 型別和直接呼叫。歷史 stdin 協定集中到 compat.rs；舊版 adapter 仍使用相同渲染及驗證實作，不在原生流程中重新編碼或解析欄位。保留固定歷史參考、原生負例、跨瀏覽器及品質關卡。

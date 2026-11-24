@@ -1,6 +1,5 @@
 //! Site verification over normalized HTML and URL facts from the HTML5 parser.
-//! Rust owns the rules, filesystem checks and final counts; the bridge does not
-//! substitute a partial HTML parser for parse5 or WHATWG URL semantics.
+//! The native collector and the historical adapter share one typed verifier.
 use super::{Result, count, emit, field};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -319,7 +318,7 @@ pub(super) fn verify(input: &Input<'_>) -> Result<Summary> {
         let (h1, main, missing_alt) = (page.h1, page.main, page.missing_alt);
         let lang = page.lang.as_str();
         let ids = &page.ids;
-        if !unique(&ids) {
+        if !unique(ids) {
             errors.push(format!("{route} 有重複 id"))
         }
         if h1 != 1 {
