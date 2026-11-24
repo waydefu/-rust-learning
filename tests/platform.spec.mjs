@@ -164,3 +164,27 @@ test('teaching notes have visible labels, themes and mobile layout', async ({pag
   await expect(page.locator('[data-callout="context"] .callout-title')).toHaveText('網址輸入之後，瀏覽器做了什麼？');
   await expect(page.locator('.prose')).not.toContainText('<!-- callout:');
 });
+
+
+test('welcome motion is cosmetic, one-time and does not block reading', async ({page}) => {
+  await page.emulateMedia({reducedMotion:'no-preference'});
+  await page.goto(target());
+  const badge=page.locator('.startup-motion');
+  await expect(badge).toHaveCount(1);
+  await expect(badge).toHaveAttribute('aria-hidden','true');
+  await expect(badge).toHaveCSS('pointer-events','none');
+  await expect(page.getByRole('heading',{level:1})).toBeVisible();
+  await expect(badge).toHaveCount(0,{timeout:3000});
+  await page.reload();
+  await expect(badge).toHaveCount(0);
+  await expect(page.getByRole('link',{name:'開始學習'})).toBeVisible();
+});
+test('reduced motion skips welcome and keeps deep links usable', async ({page}) => {
+  await page.emulateMedia({reducedMotion:'reduce'});
+  await page.goto(target());
+  await expect(page.locator('.startup-motion')).toHaveCount(0);
+  await expect(page.locator('.hero-copy')).toHaveCSS('animation-name','none');
+  await page.goto(target('chapters/ownership/#ownership-lab'));
+  await expect(page.locator('#ownership-lab')).toBeVisible();
+  await expect(page.locator('.startup-motion')).toHaveCount(0);
+});

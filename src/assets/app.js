@@ -292,3 +292,33 @@ if (quiz) {
     if (correct) answer.open = true;
   });
 }
+
+
+// A non-modal welcome animation once per tab session. No remote resources,
+// content hiding, focus changes, or delayed navigation; no-JS pages stay intact.
+const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
+function startupMotion() {
+  if (motionPreference.matches || location.hash || !document.querySelector('.hero')) return;
+  try {
+    if (sessionStorage.getItem('rust-learning-startup') === '1') return;
+    sessionStorage.setItem('rust-learning-startup', '1');
+  } catch { return; }
+  const badge = document.createElement('div');
+  badge.className = 'startup-motion';
+  badge.setAttribute('aria-hidden', 'true');
+  const logo = document.createElement('img');
+  logo.src = page.base + 'assets/favicon.svg';
+  logo.alt = '';
+  const copy = document.createElement('div');
+  const title = document.createElement('strong');
+  title.textContent = 'Rust 學習工坊';
+  const sub = document.createElement('small');
+  sub.textContent = 'RUST LEARNING LAB';
+  copy.append(title, sub);
+  badge.append(logo, copy);
+  document.body.append(badge);
+  const remove = () => badge.remove();
+  badge.addEventListener('animationend', event => { if (event.target === badge) remove(); }, {once:false});
+  setTimeout(remove, 1400);
+}
+startupMotion();
