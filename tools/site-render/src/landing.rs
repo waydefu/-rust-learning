@@ -38,7 +38,7 @@ fn card(base: &str, entry: &Entry<'_>, stage: &str, check: &str, chevron: &str, 
 }
 
 pub(super) fn process_landing<'a>(n: usize, fields: &mut impl Iterator<Item=&'a str>, out: &mut Vec<u8>) -> Result<()> {
-    if n != 2 { return Err("首頁渲染必須包含兩頁".into()); }
+    if n != 3 { return Err("首頁渲染必須包含兩頁".into()); }
     let base = field(fields)?;
     if base != "/" && (!base.starts_with('/') || !base.ends_with('/') || !safe_path(&base[1..base.len()-1])) {
         return Err("首頁基礎網址無效".into());
@@ -93,7 +93,9 @@ pub(super) fn process_landing<'a>(n: usize, fields: &mut impl Iterator<Item=&'a 
         ("layers",layers),("target",target),("list",list),("stages",&stages),("footer",&footer)])?;
     let resource = fill(RESOURCES,&[("base",base),("chevron14",chevron14),("cards",&resources),("footer",&footer)])?;
     emit(out,&home)?;
-    emit(out,&resource)
+    emit(out,&resource)?;
+    let missing=format!(r#"<div class="home-page secondary-page"><h1>找不到頁面</h1><p>請從課程總覽選擇章節，或使用搜尋查找教材。</p><a class="button primary" href="{base}" >返回課程總覽</a></div>"#);
+    emit(out,&missing)
 }
 
 #[cfg(test)]
@@ -116,13 +118,13 @@ mod tests {
             "A01","resources/extra","延伸","說明","1","fundamentals","入門","介紹","",
             "1","01","chapters/start","開始","內容","false"];
         let mut output = Vec::new();
-        process_landing(2,&mut fields.into_iter(),&mut output).unwrap();
+        process_landing(3,&mut fields.into_iter(),&mut output).unwrap();
         let html = String::from_utf8(output).unwrap();
         assert!(html.contains("data-start"));
         assert!(html.contains("第 1–1 章"));
         assert!(html.contains("/course/resources/extra/"));
         let mut invalid = fields;
         invalid[10] = "2";
-        assert!(process_landing(2,&mut invalid.into_iter(),&mut Vec::new()).is_err());
+        assert!(process_landing(3,&mut invalid.into_iter(),&mut Vec::new()).is_err());
     }
 }

@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { catalog, chapters, md, projectRoot, readLesson } from '../src/course.mjs';
 import { makeSite } from '../src/site.mjs';
-import { applyNativeMetadata, applyNativeNavigation, applyNativeLanding, applyNativeReaders, applyNativeFences, renderNativeBodies, renderNativeLayouts } from '../src/native-render.mjs';
+import { applyNativeMetadata, applyNativeNavigation, applyNativeLanding, applyNativeReaders, applyNativePageData, applyNativeFences, renderNativeBodies, renderNativeLayouts } from '../src/native-render.mjs';
 
 const inputBase = process.env.BASE_PATH || '/';
 if (!/^\/(?:[\w.-]+\/)*[\w.-]*\/?$/.test(inputBase) || inputBase.startsWith('//') || inputBase.split('/').some(segment => ['.', '..'].includes(segment))) {
@@ -49,6 +49,7 @@ const baseline = [site.home(), site.resourceIndex(), site.missing(), ...lessons.
 applyNativeNavigation(base, specs);
 applyNativeLanding(base, specs);
 applyNativeReaders(base, specs.slice(3), lessons);
+applyNativePageData(base, specs, lessons);
 const pages = renderNativeLayouts(base, specs);
 for (let i = 0; i < pages.length; i++) {
   if (pages[i] !== baseline[i]) throw new Error('Rust 頁面模板與原版不一致：' + pagePaths[i]);

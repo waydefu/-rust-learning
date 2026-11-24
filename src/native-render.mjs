@@ -180,22 +180,29 @@ export function applyNativeLanding(base, specs) {
       fields.push(entry.id, entry.path, entry.title, entry.description, String(entry.slug === 'ownership'));
     }
   }
-  const result = invoke('landing-v1', 2, fields);
-  if (result.length !== 2 || specs[0].current !== '' || specs[1].current !== 'resources') {
+  const result = invoke('landing-v1', 3, fields);
+  if (result.length !== 3 || specs[0].current !== '' || specs[1].current !== 'resources' || specs[2].current !== '404') {
     throw new Error('Rust 首頁與延伸資源回傳格式不一致');
   }
-  for (let i=0; i<2; i++) {
+  for (let i=0; i<3; i++) {
     if (result[i] !== specs[i].body) throw new Error('Rust 首頁模板與原版不一致：' + specs[i].current);
     specs[i].body = result[i];
   }
-  console.log('Rust 首頁與延伸資源模板逐字比對：2 頁通過');
+  console.log('Rust 首頁、延伸資源與 404 模板逐字比對：3 頁通過');
 }
 
 export function applyNativeReaders(base, specs, lessons) {
   const fields = [base, icon('chevron',14),icon('list',17),icon('check',17),icon('target',18),icon('layers',17),icon('chevron',16)];
+  fields.push(String(stages.length));
+  for (const stage of stages) {
+    fields.push(stage.title,String(stage.chapters.length));
+    for(const entry of stage.chapters)fields.push(entry.id,entry.path,entry.title);
+  }
   for (let i=0; i<lessons.length; i++) {
-    const {entry,title}=lessons[i], p=specs[i].reader;
-    fields.push(entry.slug,String(chapters.includes(entry)),String(resources.includes(entry)),entry.title,title,entry.description,p.label,p.stageTitle,p.labelIcon,entry.source.id,p.intro,p.rest,p.outline,p.extra,p.outlineLinks,p.pagination);
+    const {entry,title,headings}=lessons[i], p=specs[i].reader;
+    fields.push(entry.slug,String(chapters.includes(entry)),String(resources.includes(entry)),entry.id,entry.title,title,entry.description,p.stageTitle,p.labelIcon,entry.source.id,p.intro,p.rest);
+    const toc=headings.filter(h=>h.level===2);
+    fields.push(String(toc.length),...toc.flatMap(h=>[h.id,h.label]));
     const ownership=entry.slug==='ownership';
     fields.push(String(ownership));
     if (ownership) for (const step of ownershipSteps) fields.push(step.code,step.message);
@@ -277,4 +284,28 @@ export function verifyNativeSite(pages, fields) {
   const result=invoke('site-check-v1',pages,fields);
   if(result.length!==4||result.some(value=>!/^\d+$/.test(value)))throw new Error('Rust 網站驗證回傳格式不一致');
   return result.map(Number);
+}
+
+export function applyNativePageData(base,specs,lessons) {
+  const fields=[base,String(chapters.length),...chapters.flatMap(e=>[e.id,e.path])];
+  const entries=new Map(lessons.map(l=>[l.entry.path,l.entry]));
+  for(const spec of specs){
+    const entry=entries.get(spec.current);
+    const chapter=entry&&chapters.includes(entry)?entry.id:'';
+    const ownership=entry?.slug==='ownership';
+    fields.push(chapter,String(ownership));
+    if(ownership){
+      fields.push(String(ownershipSteps.length));
+      for(const s of ownershipSteps)fields.push(s.code,s.source,s.target,s.owner??'',s.borrowed===undefined?'':String(s.borrowed),s.message);
+    }
+    const quiz=quizzes[entry?.slug];
+    fields.push(quiz?String(quiz.answer):'');
+  }
+  const result=invoke('page-data-v1',specs.length,fields);
+  if(result.length!==specs.length)throw new Error('Rust page-data 數量不一致');
+  for(let i=0;i<specs.length;i++){
+    if(result[i]!==specs[i].pageData)throw new Error('Rust page-data 與原版不一致：'+specs[i].current);
+    specs[i].pageData=result[i];
+  }
+  console.log('Rust 互動資料 JSON 逐字比對：'+specs.length+' 頁通過');
 }
