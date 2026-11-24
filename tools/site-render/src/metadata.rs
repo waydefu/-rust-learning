@@ -33,7 +33,7 @@ fn anchors<'a>(labels: impl IntoIterator<Item = &'a str>) -> Vec<String> {
         if *n == 1 { format!("s-{stem}") } else { format!("s-{stem}-{n}") }
     }).collect()
 }
-fn headings(source: &str) -> Result<(String, Vec<(u8, String, String)>)> {
+pub(super) fn headings(source: &str) -> Result<(String, Vec<(u8, String, String)>)> {
     let mut found: Vec<(u8, String)> = Vec::new();
     let mut active: Option<(u8, String)> = None;
     let mut first = true;

@@ -1,29 +1,3 @@
-const paths = {
-  home: '<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
-  route: '<rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="15" width="6" height="6" rx="1"/><path d="M9 6h5a4 4 0 0 1 0 8h-4a4 4 0 0 0 0 8M15 18h-5"/>',
-  book: '<path d="M12 6c-3-3-6-3-10-2v15c4-1 7-1 10 2 3-3 6-3 10-2V4c-4-1-7-1-10 2Zm0 0v15"/>',
-  layers: '<path d="m12 2 10 5-10 5L2 7l10-5ZM2 12l10 5 10-5M2 17l10 5 10-5"/>',
-  search: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/>',
-  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/>',
-  moon: '<path d="M20.9 13.3a9 9 0 1 1-10.2-10.2 7 7 0 0 0 10.2 10.2Z"/>',
-  github: '<path d="M9 19c-4.4 1.3-4.4-2.2-6.1-2.6M15 22v-3.4c0-1 .1-1.4-.5-2 3-.4 6.2-1.5 6.2-6.9A5.4 5.4 0 0 0 19.3 6c.1-.4.7-1.8-.1-3.8 0 0-1.1-.4-3.8 1.4a13 13 0 0 0-6.8 0C5.9 1.8 4.8 2.2 4.8 2.2c-.8 2-.2 3.4-.1 3.8a5.4 5.4 0 0 0-1.4 3.7c0 5.4 3.2 6.5 6.2 6.9-.5.4-.5 1.1-.5 2V22"/>',
-  menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
-  close: '<path d="m6 6 12 12M18 6 6 18"/>',
-  chevron: '<path d="m9 18 6-6-6-6"/>',
-  down: '<path d="m6 9 6 6 6-6"/>',
-  code: '<path d="m8 6-6 6 6 6m8-12 6 6-6 6m-3-15-2 18"/>',
-  terminal: '<path d="m5 7 5 5-5 5m7 0h7"/>',
-  target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',
-  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
-  check: '<path d="m5 12 4 4L19 6"/>',
-  copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
-  spark: '<path d="M12 2v6m0 8v6M2 12h6m8 0h6M5 5l4 4m6 6 4 4m0-14-4 4m-6 6-4 4"/>',
-  list: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
-  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5m0-8h.01"/>',
-  shield: '<path d="M12 22s7-3 7-10V5l-7-3-7 3v7c0 7 7 10 7 10Z"/><path d="m9 12 2 2 4-4"/>',
-  grid: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
-  box: '<path d="m12 3 9 5v8l-9 5-9-5V8l9-5Zm0 9 9-4m-9 4-9-4m9 4v9"/>',
-  branch: '<circle cx="6" cy="5" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="19" r="2"/><path d="M6 7v10m0-3c0-4 12 0 12-6"/>',
-  cpu: '<rect x="5" y="5" width="14" height="14" rx="2"/><rect x="9" y="9" width="6" height="6" rx="1"/><path d="M9 2v3m6-3v3M9 19v3m6-3v3M2 9h3m-3 6h3m14-6h3m-3 6h3"/>'
-};
+import { siteData } from './site-data.mjs';
+const paths = siteData.icons;
 export const icon = (name, size=20) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${paths[name]}</svg>`;

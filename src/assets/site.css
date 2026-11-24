@@ -390,3 +390,55 @@ dialog::backdrop { background: #0c1223a8; }
 @media (max-width: 540px) {
   .prose .lesson-callout { padding: 12px 13px; margin: 16px 0; }
 }
+
+
+/* Motion is progressive enhancement: content is visible immediately, never
+   held behind a loading screen. A one-time badge is cosmetic and click-through. */
+@media (prefers-reduced-motion: no-preference) {
+  :root { --motion-ease: cubic-bezier(.2,.75,.25,1); }
+  .brand img { transition: transform .28s var(--motion-ease); }
+  .hero-copy, .hero-figure, .progress-card, .lesson-head {
+    animation: rust-enter .42s var(--motion-ease) both;
+  }
+  .hero-figure { animation-delay: .06s; }
+  .progress-card { animation-delay: .09s; }
+  .chapter-card, .button, .icon-button, .nav-row, .lab-controls button {
+    /* Do not interpolate theme colors: intermediate light/dark contrast can fail WCAG. */
+    transition: transform .18s var(--motion-ease), box-shadow .18s ease;
+  }
+  .button:active, .icon-button:active, .lab-controls button:active { transform: scale(.97); }
+  @media (hover: hover) and (pointer: fine) {
+    .chapter-card:hover { transform: translateY(-3px); box-shadow: 0 8px 22px #17213a12; }
+    .brand:hover img { transform: rotate(-7deg) scale(1.06); }
+  }
+  dialog[open] { animation: rust-dialog .22s var(--motion-ease) both; }
+  [data-quiz-feedback][data-result] { animation: rust-enter .23s var(--motion-ease) both; }
+  #memory-state[data-owner] .memory-grid svg > path { animation: rust-arrow .32s ease-out both; }
+  #memory-state[data-owner] .memory-bytes { transition: opacity .22s ease, transform .22s var(--motion-ease); }
+  #memory-state[data-owner="none"] .memory-bytes { transform: scale(.95); }
+  .startup-motion {
+    position: fixed; z-index: 100; inset: auto 16px 16px auto;
+    display: flex; align-items: center; gap: 10px; pointer-events: none;
+    max-width: calc(100vw - 32px); padding: 11px 14px;
+    border: 1px solid var(--line); border-radius: 15px;
+    color: var(--ink); background: var(--paper);
+    box-shadow: 0 8px 28px #0002;
+    animation: rust-startup 1.1s var(--motion-ease) both;
+  }
+  .startup-motion img { width: 36px; height: 36px; animation: rust-spin-in .42s var(--motion-ease) both; }
+  .startup-motion strong { display: block; font-size: .92rem; }
+  .startup-motion small { display: block; color: var(--muted); font-size: .72rem; letter-spacing: .06em; }
+}
+@keyframes rust-enter { from { transform: translateY(7px); } to { transform: none; } }
+@keyframes rust-dialog { from { scale: .98; } to { scale: 1; } }
+@keyframes rust-startup {
+  0% { opacity: 0; transform: translateY(10px); }
+  22%, 68% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(5px); visibility: hidden; }
+}
+@keyframes rust-arrow { from { opacity: .25; stroke-dasharray: 3 5; } to { opacity: 1; stroke-dasharray: none; } }
+@keyframes rust-spin-in { from { transform: rotate(-20deg) scale(.8); } to { transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .startup-motion { display: none !important; }
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}

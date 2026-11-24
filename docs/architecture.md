@@ -10,13 +10,13 @@ CommonMark 可以直接在 GitHub 與 HackMD 編輯。技術圖解使用同庫 S
 
 ## Rust 化的演進方向
 
-目前是混合式建置：Rust 負責教材預檢、搜尋索引、本機 HTTP 預覽、CommonMark 正文候選與共用 HTML 文件模板；Rust 亦從 Markdown 產生章節標題、Unicode 錨點與共用側欄導覽，逐項或逐字與舊版比對。Rust 接管首頁、404、閱讀頁與互動教材模板、page-data JSON、原生高亮、教材範例抽取與執行、網站驗證規則。Node.js 仍負責 catalog JSON 解碼、搜尋全文、HTML5/URL 解析事實、橋接與舊版相容性比對；第十階段才整合純 Rust 建置入口並移除過渡橋接。只有在相容性報告確認後才能移除舊工具。GitHub Pages 只接受靜態輸出，因此不需要改成持續運作的 Rust HTTP 伺服器。瀏覽器中的互動仍使用少量 JavaScript，只有適合的計算模組才評估 Rust/Wasm。維持既有網址、錨點、HackMD 編輯方式及瀏覽器學習紀錄。尚未完成全站 Rust 移植。
+正式建置與檢查入口為 `site-render build/check/check-rust/dev`。Rust 使用 serde_json 讀取 catalog 與互動資料、pulldown-cmark 解析 Markdown、scraper/html5ever 解析 HTML5、url 進行 WHATWG URL 解析，並以原生模組產生頁面、搜尋索引、診斷報告及執行教材範例。Node 舊版只在 CI 內做比較與瀏覽器測試。維持既有網址、錨點、HackMD、學習紀錄及純靜態 Pages，保留必要的瀏覽器 JavaScript，不引入 Wasm。
 
 ### Rust 正文與 HTML 模板
 
 `tools/site-render` 使用鎖定版 pulldown-cmark 0.13.0（Rust 1.71.1 以上可編譯）解析 CommonMark，開啟表格與刪除線。Rust 接收原始 Markdown、現有章節錨點及高亮程式片段，檢查程式區塊內容與順序、標題層級，轉換教學方塊，拒絕不安全的 URL 並跳脫原始 HTML。Node 端以解析後 DOM 的標籤、屬性與文字（程式碼精確比對）作為相容性閘門；任何正文或高亮差異均停止建置，成功報告記錄零回退。每個 HTML 文件的外層模板均由 Rust 產生，與原模板逐字比對，失敗則停止建置。
 
-目前仍需 Node.js，並且兩套渲染器在建置期有額外成本；網站送到瀏覽器的資源量不因這項過渡設計增加（另有獨立的建置報告，不會由一般閱讀流程下載）。沒有實測證據前，不宣稱全站已純 Rust 化或效能提升。
+舊版 Node 渲染器只用於 CI 的相容性測試，不會被 Rust CLI 呼叫。獨立 job 阻擋 Node/npm/npx 並確認沒有 node_modules。Pages build job 同樣不安裝 npm 依賴。完整網站樹逐位元組比對，渲染報告則比較 JSON 資料；不將報告當作所有未來輸入相容的保證。
 
 ### 靜態產物寫入與行為重播
 
@@ -24,7 +24,7 @@ Rust `site-write` 接收所有生成檔案的 UTF-8 欄位，驗證路徑與重�
 
 ### 搜尋索引與預覽介面
 
-`tools/site-tools` 是無第三方依賴的 Rust 2024 crate。現有 Markdown 解析器透過 stdin 傳遞版本化的 UTF-8 欄位（NUL 分隔；建置器拒絕欄位內的 NUL，資料上限 16 MiB），Rust 驗證資料並產生既有 JSON schema，保留標題、診斷碼、程式內容、網址及二至三級錨點。這是過渡介面，未來 Rust Markdown 解析器可直接建立索引資料結構，不必傳輸中間格式。`npm run check` 逐欄比對原先的 JS 索引契約，避免影響搜尋。
+`tools/site-tools` 是無第三方依賴的 Rust 2024 crate。原生 Markdown 解析器透過 stdin 傳遞版本化的 UTF-8 欄位（NUL 分隔；建置器拒絕欄位內的 NUL，資料上限 16 MiB），Rust 驗證資料並產生既有 JSON schema，保留標題、診斷碼、程式內容、網址及二至三級錨點。這是兩個 Rust 工具之間的內部介面。原生 check 重新讀取教材並比對搜尋索引完整欄位，CI 再與舊版 JS 索引逐位元組比對。
 
 `npm run dev` 建置後啟動 Rust `site-preview`，支援 GET/HEAD、子路徑、目錄索引、308、404、MIME 類型與簡單的 HTTP 請求大小及讀寫逾時限制。它只供本機開發，預設綁定 loopback；會解碼並檢查路徑、拒絕遍歷及指向根目錄外的符號連結，但不是完整生產級 HTTP 實作。GitHub Pages 仍直接發布 dist，預覽工具不會在公開網站上執行。CI 會用 curl 實際請求預覽伺服器並比對搜尋索引。
 
@@ -55,3 +55,7 @@ pulldown-cmark 及其建置期依賴以 tools/site-render/Cargo.lock 鎖定。ma
 - Pixel-Games 的按需讀檔與手機驗收區分，用於主導覽和 QA。 [AGENTS.md](https://github.com/waydefu/Pixel-Games/blob/main/AGENTS.md)
 - Agent-Tool 的定向檢查和可重現命令，用於教材範例與瀏覽器測試。 [AGENTS.md](https://github.com/waydefu/Agent-Tool/blob/main/AGENTS.md)
 - GPU 將結果綁到驗證材料及裝置條件，這裡以 Git 提交和 Actions 分別記錄建置、部署與線上驗證。 [README.md](https://github.com/waydefu/GPU/blob/main/README.md)
+
+### 動效與無障礙
+
+首頁啟動提示使用 CSS 與既有瀏覽器 JS，在每個分頁工作階段至多播放一次；無遮罩、不阻擋點擊、不搶焦點，深層錨點與 reduced-motion 不播放。卡片、按鈕、閱讀頁首、對話框、測驗及記憶體圖採短時動畫，不延遲導覽或正文。無 JavaScript 時教材仍直接可讀。Playwright 驗證啟動提示、工作階段與減少動態效果。
