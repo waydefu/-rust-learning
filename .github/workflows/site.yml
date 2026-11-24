@@ -40,18 +40,19 @@ jobs:
           path: .migration-evidence/
           include-hidden-files: true
           if-no-files-found: ignore
-      - run: npm run build && node scripts/migration/compare-site-check.mjs
-      - name: Native CLI smoke build and check
-        run: |
-          cargo run --locked --manifest-path tools/site-render/Cargo.toml -- build
-          cargo run --locked --manifest-path tools/site-render/Cargo.toml -- check
-          node scripts/check.mjs
+      - run: node scripts/migration/compare-full-app.mjs && node scripts/migration/compare-site-check.mjs
       - name: Rust 範例執行器與原版對照
         run: node scripts/migration/compare-examples.mjs
       - run: npx playwright install --with-deps chromium
-      - run: npm run build && node scripts/migration/compare-site-check.mjs && npm run test:browser
+      - run: node scripts/migration/compare-full-app.mjs && node scripts/migration/compare-site-check.mjs && npm run test:browser
         env:
           BASE_PATH: /-rust-learning/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: full-app-evidence
+          path: .migration-evidence/full-app-*.json
+          if-no-files-found: ignore
       - name: 驗證 Rust 本機預覽伺服器
         env:
           BASE_PATH: /-rust-learning/
@@ -59,12 +60,12 @@ jobs:
           PORT: 4173
         shell: bash
         run: |
-          cargo build --locked --manifest-path tools/site-tools/Cargo.toml --bin site-preview
-          tools/site-tools/target/debug/site-preview dist &
+          cargo build --locked --manifest-path tools/site-render/Cargo.toml
+          setsid tools/site-render/target/debug/site-render dev &
           server=$!
-          trap 'kill "$server" 2>/dev/null || true; wait "$server" 2>/dev/null || true' EXIT
+          trap 'kill -- -"$server" 2>/dev/null || true; wait "$server" 2>/dev/null || true' EXIT
           url="http://127.0.0.1:4173/-rust-learning"
-          curl --fail --silent --show-error --retry 5 --retry-connrefused --retry-delay 1 --max-time 10 "$url/" -o /tmp/rust-preview-home.html
+          curl --fail --silent --show-error --retry 12 --retry-connrefused --retry-delay 1 --max-time 10 "$url/" -o /tmp/rust-preview-home.html
           grep -Fq 'Rust 學習工坊' /tmp/rust-preview-home.html
           curl --fail --silent --show-error --max-time 10 "$url/chapters/ownership/" -o /tmp/rust-preview-lesson.html
           grep -Fq 'ownership-lab' /tmp/rust-preview-lesson.html
@@ -75,10 +76,35 @@ jobs:
           test "$(curl --silent --show-error --max-time 10 --output /dev/null --write-out '%{http_code}' "$url/not-here/")" = 404
           test "$(curl --path-as-is --silent --show-error --max-time 10 --output /dev/null --write-out '%{http_code}' "$url/%2e%2e/README.md")" = 404
 
+  native_only:
+    name: 無 Node 的 Rust CLI 驗證
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: 驗證無 Node 及 npm 依賴
+        shell: bash
+        run: |
+          test ! -d node_modules
+          mkdir "$RUNNER_TEMP/no-node"
+          for name in node nodejs npm npx; do
+            printf '#!/bin/sh\nexit 97\n' > "$RUNNER_TEMP/no-node/$name"
+            chmod +x "$RUNNER_TEMP/no-node/$name"
+          done
+          export PATH="$RUNNER_TEMP/no-node:$PATH"
+          export BASE_PATH=/-rust-learning/
+          cargo run --locked --manifest-path tools/site-render/Cargo.toml -- build
+          cargo run --locked --manifest-path tools/site-render/Cargo.toml -- check
+          cargo run --locked --manifest-path tools/site-render/Cargo.toml -- check-rust
+          test ! -d node_modules
+          jq -e '.highlight.native == .highlight.total and .highlight.fallback == 0 and all(.markdown[]; .renderer == "rust")' dist/build-render-report.json
+
   build_pages:
     name: 建置與上傳 Pages 產物
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    needs: verify
+    needs: [verify, native_only]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -91,14 +117,12 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v6
-        with:
-          node-version-file: .nvmrc
-          cache: npm
       - uses: actions/configure-pages@v5
         id: pages
-      - run: npm ci
-      - run: npm run build && npm run check
+      - name: 純 Rust 建置與驗證
+        run: |
+          cargo run --locked --manifest-path tools/site-render/Cargo.toml -- build
+          cargo run --locked --manifest-path tools/site-render/Cargo.toml -- check
         env:
           BASE_PATH: ${{ steps.pages.outputs.base_path }}
       - name: 記錄發布版本與產物名稱

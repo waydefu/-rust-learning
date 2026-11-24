@@ -4,24 +4,25 @@
 
 ## 本機使用
 
-建置網站需要 Node.js 24、Cargo 及 Rust 1.85.1（由 `rust-toolchain.toml` 指定）。Rust 原生工具驗證教材、產生章節標題與錨點、搜尋索引、側欄導覽、渲染 Markdown、全站頁面模板、互動資料、語法高亮，並執行教材範例、檢查網站產物、寫入網站及提供本機預覽。Node.js 仍負責資料解碼、解析橋接與舊版相容性對照；純 Rust 建置總入口屬下一階段。一般閱讀只需瀏覽器。
+建置網站只需要 Cargo 及 Rust 1.85.1（由 rust-toolchain.toml 指定）。正式建置、檢查、教材範例與本機預覽均由 Rust CLI 提供，不需要 Node.js、npm 或 node_modules。Node.js 24 只用於 CI 的舊版對照及 Playwright 瀏覽器測試。一般閱讀只需瀏覽器。
 
 ```sh
-npm ci
-npm run dev
+cargo run --locked --manifest-path tools/site-render/Cargo.toml -- dev
 ```
 
 開啟終端機顯示的本機網址（預設 127.0.0.1:4173）。預覽由 Rust 的 site-preview 提供；修改教材後重新啟動。若需在可信任區域網路上測試手機，可明確設定 HOST=0.0.0.0，勿暴露公網。站內進度和最後閱讀位置儲存在目前瀏覽器及網站來源。
 
 ```sh
-npm run build
-npm run check
-npm run check:rust
+cargo run --locked --manifest-path tools/site-render/Cargo.toml -- build
+cargo run --locked --manifest-path tools/site-render/Cargo.toml -- check
+cargo run --locked --manifest-path tools/site-render/Cargo.toml -- check-rust
 cargo test --locked --manifest-path tools/lesson-check/Cargo.toml
 cargo test --locked --manifest-path tools/site-tools/Cargo.toml
 cargo test --locked --manifest-path tools/site-render/Cargo.toml
-BASE_PATH=/-rust-learning/ npm run build
-BASE_PATH=/-rust-learning/ npm run check
+BASE_PATH=/-rust-learning/ cargo run --locked --manifest-path tools/site-render/Cargo.toml -- build
+BASE_PATH=/-rust-learning/ cargo run --locked --manifest-path tools/site-render/Cargo.toml -- check
+# 僅做舊版與瀏覽器測試時需要 Node：
+npm ci
 npx playwright install chromium
 npm run test:browser
 ```
@@ -30,20 +31,21 @@ npm run test:browser
 
 ## 渲染相容性
 
-每次建置都將 Rust 正文與原 Markdown DOM 比對，程式區塊、頁面模板及互動 JSON 逐字比對；任何不相符即停止建置，不回退到舊渲染器。成功的 `dist/build-render-report.json` 記錄各篇正文及各語言高亮相容率。此過渡機制不是完全移除 Node.js 的宣告。
+正式 Rust CLI 直接讀取 catalog、site-data.json 和 Markdown，原生生成全部網站產物。CI 使用舊版建置器比對根路徑及 Pages 子路徑的完整網站樹；任何差異均阻止合併與部署。成功的 `dist/build-render-report.json` 記錄各篇正文及各語言原生生成數量，沒有回退到 Node 的路徑。
 
 ## Rust 移植驗證
 
 建置器使用 Rust 的 `site-write` 建立網站輸出、複製資源並替換 `dist`；Node 原版寫入器保留在 `scripts/migration/`，只作測試對照。CI 會逐位元組比較完整網站輸出，並使用固定版本的 rust-anything v4.0.0 對獨立寫入器的成功與錯誤案例執行錄製及重播。Linux x86_64 可執行 `bash scripts/migration/replay-site-write.sh`；它只在暫存目錄下載經 SHA-256 驗證的工具，不變更 Agent 設定或教材工具鏈。詳見 [移植紀錄](docs/rust-port.md)。
 
-正式 CI 與 Pages 建置使用 `REQUIRE_NATIVE_MARKDOWN=1`，任何正文回退都會阻止發布；本機仍可用既有相容性報告診斷差異。
+另有獨立 CI job 在沒有 node_modules 且阻擋 node/npm/npx 的 PATH 下執行 build、check、check-rust，Pages 發布也直接使用 Rust CLI。舊版只保留為測試對照。
 
 ## 專案位置
 
 | 位置 | 用途 |
 | --- | --- |
 | [content/](content/) | 教材 Markdown、章節路徑與來源索引 |
-| [src/](src/) | 頁面模板、圖解、測驗、樣式和瀏覽器互動 |
+| [src/](src/) | 舊版驗收對照、樣式和瀏覽器互動 |
+| [content/site-data.json](content/site-data.json) | 共用課程階段、SVG 圖示、互動圖解與測驗資料 |
 | [scripts/](scripts/) | 產生靜態頁面、檢查內容與 Rust 範例 |
 | [tools/lesson-check/](tools/lesson-check/) | Rust 原生教材建置前檢查器 |
 | [tools/site-tools/](tools/site-tools/) | Rust 原生搜尋索引、網站產物寫入與本機 HTTP 預覽 |

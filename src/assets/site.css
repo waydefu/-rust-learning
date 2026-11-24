@@ -413,8 +413,9 @@ dialog::backdrop { background: #0c1223a8; }
   }
   dialog[open] { animation: rust-dialog .22s var(--motion-ease) both; }
   [data-quiz-feedback][data-result] { animation: rust-enter .23s var(--motion-ease) both; }
-  .memory-state[data-owner] .memory-bytes { transition: opacity .22s ease, transform .22s var(--motion-ease); }
-  .memory-state[data-owner="none"] .memory-bytes { transform: scale(.95); }
+  #memory-state[data-owner] .memory-grid svg > path { animation: rust-arrow .32s ease-out both; }
+  #memory-state[data-owner] .memory-bytes { transition: opacity .22s ease, transform .22s var(--motion-ease); }
+  #memory-state[data-owner="none"] .memory-bytes { transform: scale(.95); }
   .startup-motion {
     position: fixed; z-index: 100; inset: auto 16px 16px auto;
     display: flex; align-items: center; gap: 10px; pointer-events: none;
@@ -435,6 +436,7 @@ dialog::backdrop { background: #0c1223a8; }
   22%, 68% { opacity: 1; transform: translateY(0); }
   100% { opacity: 0; transform: translateY(5px); visibility: hidden; }
 }
+@keyframes rust-arrow { from { opacity: .25; stroke-dasharray: 3 5; } to { opacity: 1; stroke-dasharray: none; } }
 @keyframes rust-spin-in { from { transform: rotate(-20deg) scale(.8); } to { transform: none; } }
 @media (prefers-reduced-motion: reduce) {
   .startup-motion { display: none !important; }

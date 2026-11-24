@@ -73,3 +73,11 @@ PR #10 已合併；PR #11 拆分 Pages 產物上傳與部署 job，main `3d983a3
 根路徑與 Pages 子路徑都必須通過 31/31 原生正文、全部 fenced code 原生高亮零回退、34 頁完整 HTML 與互動資料逐字對照、全網站檢查、Rust 範例與舊版統計對照、負例、行為重播、瀏覽器與本機預覽驗證。以 PR #12 最新提交的 Actions 成功紀錄為準；PR 未合併前不宣稱正式部署。
 
 第十階段再整合純 Rust 建置總入口、消除 Node 的 catalog/搜尋全文/HTML5/URL/JSON 解析橋接，遷移圖示及互動資料來源，執行全應用程式行為驗證。現有 rust-anything 14 案僅為 writer 單元，不宣稱完成 app lift。
+
+## 第十階段：純 Rust CLI 與完整行為對照
+
+PR #12 已合併，main a51017e 的 Actions #40 首次發布成功。此 PR #13 新增 site-render 的 build/check/check-rust/dev 入口，讀取同一份 catalog.json、site-data.json 及原始教材，使用鎖定 serde_json、scraper/html5ever、url 取代 Node 解碼橋接；高亮、Markdown、模板、互動 JSON、索引、驗證規則與原生工具協作均由 Rust 執行。正式 Pages job 不再執行 npm ci，Node 只用於參考版及瀏覽器測試。CI 新增完整網站樹對照、錯誤路徑拒絕、原生檢查器正負例、Rust 範例對照及無 Node 的獨立驗證。根目錄和子路徑的原生輸出均須通過。實際 CI 結果以 PR #13 最新紀錄為準；未合併或部署。rust-anything writer 原有 14 案重播保留，完整應用以實際 CLI 產物與檢查結果作黑箱比對，不宣稱已執行上游 scaffold 的 app lift。
+
+### 動效與無障礙
+
+首頁啟動提示使用 CSS 與既有瀏覽器 JS，在每個分頁工作階段至多播放一次；無遮罩、不阻擋點擊、不搶焦點，深層錨點與 reduced-motion 不播放。卡片、按鈕、閱讀頁首、對話框、測驗及記憶體圖採短時動畫，不延遲導覽或正文。無 JavaScript 時教材仍直接可讀。Playwright 驗證啟動提示、工作階段與減少動態效果。

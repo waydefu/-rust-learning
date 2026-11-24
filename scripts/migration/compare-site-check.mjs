@@ -3,7 +3,9 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { projectRoot } from '../../src/course.mjs';
 const run=path=>execFileSync(process.execPath,[path],{cwd:projectRoot,encoding:'utf8',stdio:['ignore','pipe','inherit'],maxBuffer:64*1024*1024});
-const native=run('scripts/check.mjs');
+const cli=['run','--quiet','--locked','--manifest-path','tools/site-render/Cargo.toml','--'];
+const cargo=process.env.CARGO||'cargo';
+const native=execFileSync(cargo,[...cli,'check'],{cwd:projectRoot,encoding:'utf8',stdio:['ignore','pipe','inherit'],maxBuffer:64*1024*1024});
 const legacy=run('scripts/check-legacy.mjs');
 const summary=s=>s.split('\n').find(line=>line.includes('份 Markdown、')&&line.includes('站內引用'));
 if(!summary(native)||summary(native)!==summary(legacy))throw new Error('Rust 網站驗證統計與原版不一致');
@@ -27,8 +29,9 @@ if((process.env.BASE_PATH||'/')==='/'){
     if(changed===original.toString('utf8'))throw new Error('負例沒有修改任何內容：'+name);
     try{
       await writeFile(path,changed,'utf8');
-      for(const script of ['scripts/check.mjs','scripts/check-legacy.mjs']){
-        const result=spawnSync(process.execPath,[script],{cwd:projectRoot,encoding:'utf8',maxBuffer:64*1024*1024});
+      for(const [program,args] of [[cargo,[...cli,'check']],[process.execPath,['scripts/check-legacy.mjs']]]){
+        const script=program+' '+args.join(' ');
+        const result=spawnSync(program,args,{cwd:projectRoot,encoding:'utf8',maxBuffer:64*1024*1024});
         if(result.error)throw result.error;
         if(result.status===null||result.status===0||!(result.stdout+result.stderr).includes(expected)){
           throw new Error(script+' 未拒絕負例 '+name+' / '+expected+'\n'+result.stdout+'\n'+result.stderr);
