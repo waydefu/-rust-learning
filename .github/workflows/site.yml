@@ -75,6 +75,6 @@ jobs:
           curl --fail --silent --show-error --retry 4 --retry-all-errors --retry-delay 2 --max-time 20 "$endpoint/" -o /tmp/rust-home.html
           curl --fail --silent --show-error --retry 4 --retry-all-errors --retry-delay 2 --max-time 20 "$endpoint/chapters/ownership/" -o /tmp/rust-ownership.html
           curl --fail --silent --show-error --retry 4 --retry-all-errors --retry-delay 2 --max-time 20 "$endpoint/assets/site.css" -o /tmp/rust-site.css
-          rg -q 'Rust 學習工坊' /tmp/rust-home.html
-          rg -q 'ownership-lab' /tmp/rust-ownership.html
+          grep -Fq 'Rust 學習工坊' /tmp/rust-home.html
+          grep -Fq 'ownership-lab' /tmp/rust-ownership.html
           test -s /tmp/rust-site.css
