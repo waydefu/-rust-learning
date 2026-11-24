@@ -1,7 +1,7 @@
 //! Stable heading metadata: preserve the existing JavaScript anchor contract.
 use super::Result;
 use pulldown_cmark::{Event, Options, Parser, Tag, TagEnd};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use unicode_general_category::{GeneralCategory as G, get_general_category};
 use unicode_normalization::UnicodeNormalization;
 
@@ -41,16 +41,22 @@ fn stem(label: &str) -> String {
 }
 fn anchors<'a>(labels: impl IntoIterator<Item = &'a str>) -> Vec<String> {
     let mut seen = HashMap::new();
+    let mut used = HashSet::new();
     labels
         .into_iter()
         .map(|label| {
             let stem = stem(label);
             let n = seen.entry(stem.clone()).or_insert(0usize);
-            *n += 1;
-            if *n == 1 {
-                format!("s-{stem}")
-            } else {
-                format!("s-{stem}-{n}")
+            loop {
+                *n += 1;
+                let candidate = if *n == 1 {
+                    format!("s-{stem}")
+                } else {
+                    format!("s-{stem}-{n}")
+                };
+                if used.insert(candidate.clone()) {
+                    break candidate;
+                }
             }
         })
         .collect()
@@ -132,7 +138,7 @@ mod tests {
         assert_eq!(stem("a\u{345}b"), "a-b");
     }
     #[test]
-    fn frozen_unicode_anchor_contract() {
+    fn unicode_anchor_contract_and_suffix_collision_guards() {
         assert_eq!(
             anchors([
                 "ＡＢＣ ①",
@@ -180,9 +186,9 @@ mod tests {
             [
                 "s-a",
                 "s-a-2",
-                "s-a-2",
-                "s-a-3",
                 "s-a-2-2",
+                "s-a-3",
+                "s-a-2-3",
                 "s-section",
                 "s-section-2",
                 "s-c",
@@ -216,6 +222,7 @@ mod tests {
             ]
         );
         assert!(anchors([]).is_empty());
+        assert_eq!(anchors(["a-2", "a", "a"]), ["s-a-2", "s-a", "s-a-3"]);
     }
 
     #[test]

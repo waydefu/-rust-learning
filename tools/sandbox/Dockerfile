@@ -1,6 +1,6 @@
 # The image version matches rust-toolchain.toml. Dependencies are downloaded
 # only during image construction; example execution is network-isolated.
-FROM rust:1.85.1-bookworm AS builder
+FROM rust:1.85.1-bookworm@sha256:e51d0265072d2d9d5d320f6a44dde6b9ef13653b035098febd68cce8fa7c0bc4 AS builder
 WORKDIR /course
 COPY rust-toolchain.toml ./
 COPY tools/ tools/
@@ -9,7 +9,7 @@ RUN cargo build --locked --manifest-path tools/site-render/Cargo.toml --bin site
     && CARGO_HOME=/opt/example-cache cargo fetch --locked --manifest-path examples/Cargo.toml \
     && printf '[net]\noffline = true\n' > /opt/example-cache/config.toml
 
-FROM rust:1.85.1-bookworm
+FROM rust:1.85.1-bookworm@sha256:e51d0265072d2d9d5d320f6a44dde6b9ef13653b035098febd68cce8fa7c0bc4
 WORKDIR /course
 COPY rust-toolchain.toml ./
 COPY content/ content/
