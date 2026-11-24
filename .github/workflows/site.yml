@@ -39,6 +39,7 @@ jobs:
         with:
           name: migration-replay
           path: .migration-evidence/
+          include-hidden-files: true
           if-no-files-found: ignore
       - run: npm run build && npm run check
       - run: npm run check:rust
