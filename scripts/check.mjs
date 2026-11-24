@@ -113,6 +113,11 @@ for (const [route, page] of routes) {
   }
 }
 
+const report = JSON.parse(await readFile(join(dist,'build-render-report.json'),'utf8'));
+if (report.layout !== 'rust' || report.pages !== routes.size ||
+    report.markdown.length !== catalog.length ||
+    report.markdown.some((item,i) => item.slug !== catalog[i].slug || !['rust','legacy'].includes(item.renderer)) ||
+    !report.markdown.some(item => item.renderer === 'rust')) errors.push('Rust 渲染報告不完整');
 const index = JSON.parse(await readFile(join(dist,'assets','search-index.json'),'utf8'));
 if (!isDeepStrictEqual(index, expectedIndex)) errors.push('Rust 搜尋索引與原有資料契約不一致');
 if (index.length !== catalog.length || index.some(entry=>!routes.has(entry.href)||!entry.text||entry.headings.some(heading=>!routes.get(entry.href).ids.has(heading.id)))) {

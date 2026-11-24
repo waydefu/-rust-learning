@@ -4,7 +4,7 @@
 
 ## 本機使用
 
-建置網站需要 Node.js 24、Cargo 及 Rust 1.85.1（由 `rust-toolchain.toml` 指定）。Rust 原生工具驗證教材、產生搜尋索引並提供本機預覽；Node.js 渲染器仍負責 Markdown 解析與 HTML 生成。一般閱讀只需瀏覽器。
+建置網站需要 Node.js 24、Cargo 及 Rust 1.85.1（由 `rust-toolchain.toml` 指定）。Rust 原生工具驗證教材、產生搜尋索引、渲染 Markdown 與共用 HTML 頁面模板，並提供本機預覽。為了維持既有網站相容性，Node.js 仍提供舊渲染對照、語法高亮、部分頁面內容與互動元件。一般閱讀只需瀏覽器。
 
 ```sh
 npm ci
@@ -19,6 +19,7 @@ npm run check
 npm run check:rust
 cargo test --locked --manifest-path tools/lesson-check/Cargo.toml
 cargo test --locked --manifest-path tools/site-tools/Cargo.toml
+cargo test --locked --manifest-path tools/site-render/Cargo.toml
 BASE_PATH=/-rust-learning/ npm run build
 BASE_PATH=/-rust-learning/ npm run check
 npx playwright install chromium
@@ -26,6 +27,10 @@ npm run test:browser
 ```
 
 `dist/` 是靜態輸出。以本機或其他網域根目錄提供時用預設 `BASE_PATH=/`。驗證 GitHub 專案路徑時可設 `BASE_PATH=/-rust-learning/`。GitHub Actions 會讀取 Pages 的實際子路徑。Playwright 的預設測試攔截測試網域的請求，從 Pages 產物回應。也可設定 `TEST_ORIGIN` 指向已啟動的伺服器，該伺服器需用同一 Pages 子路徑。
+
+## 渲染相容性
+
+每次建置會將 Rust 正文與原本 Markdown 渲染的 DOM 比對。相容時使用 Rust 輸出，否則在終端與 `dist/build-render-report.json` 記錄原因並保留該篇舊正文；共用 HTML 文件模板一律由 Rust 生成，與原模板逐字比對。若要禁止正文回退，可設定 `REQUIRE_NATIVE_MARKDOWN=1` 執行建置。此過渡機制不是完全移除 Node.js 的宣告。
 
 ## 專案位置
 
@@ -36,6 +41,7 @@ npm run test:browser
 | [scripts/](scripts/) | 產生靜態頁面、檢查內容與 Rust 範例 |
 | [tools/lesson-check/](tools/lesson-check/) | Rust 原生教材建置前檢查器 |
 | [tools/site-tools/](tools/site-tools/) | Rust 原生搜尋索引生成與本機 HTTP 預覽 |
+| [tools/site-render/](tools/site-render/) | Rust CommonMark 渲染與 HTML 文件模板 |
 | [examples/](examples/) | 外部 crate 範例的 Cargo 設定與鎖檔。程式碼從教材抽取 |
 | [tests/](tests/) | Playwright 操作與 axe 無障礙檢查 |
 | [.github/workflows/site.yml](.github/workflows/site.yml) | Pull request 驗證與 Pages 部署 |

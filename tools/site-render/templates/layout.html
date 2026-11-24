@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="{{description}}">
+<meta name="color-scheme" content="light dark">
+<title>{{title}}</title>
+<link rel="icon" href="{{favicon}}" type="image/svg+xml">
+<script src="{{theme}}"></script>
+<link rel="stylesheet" href="{{stylesheet}}">
+<script type="module" src="{{app}}"></script>
+</head>
+<body>
+<a class="skip-link" href="#main">跳至主要內容</a>
+<header class="site-header">
+  <button type="button" id="menu-open" class="icon-button mobile-menu" hidden aria-label="開啟課程導覽" aria-haspopup="dialog">{{menu}}</button>
+  <a class="brand" href="{{base}}"><img src="{{favicon}}" width="36" height="36" alt=""><span>{{siteName}}<small>RUST LEARNING LAB</small></span></a>
+  <div class="header-actions">
+    <div class="search-wrap" hidden><button type="button" class="search-button" id="search-open" aria-haspopup="dialog" aria-label="搜尋教材">{{search19}}<span>搜尋教材</span></button><kbd data-shortcut aria-hidden="true">⌘ K</kbd></div>
+    <span class="header-divider"></span>
+    <button type="button" class="icon-button theme-button" id="theme-toggle" aria-label="切換深色模式" hidden><span class="light-icon">{{sun}}</span><span class="dark-icon">{{moon}}</span></button>
+    <a class="icon-button github-link" href="{{repository}}" aria-label="GitHub 儲存庫">{{github}}</a>
+  </div>
+</header>
+<aside class="sidebar">{{navigation}}</aside>
+<dialog class="mobile-drawer" id="menu-dialog" aria-labelledby="menu-title"><div class="dialog-head"><strong id="menu-title">課程導覽</strong><form method="dialog"><button class="icon-button" aria-label="關閉導覽">{{close}}</button></form></div>{{navigation}}</dialog>
+<dialog class="search-dialog" id="search-dialog" aria-labelledby="search-title">
+  <div class="dialog-head"><strong id="search-title">搜尋教材</strong><form method="dialog"><button class="icon-button" aria-label="關閉搜尋">{{close}}</button></form></div>
+  <label class="search-field">{{search}}<span class="sr-only">搜尋詞</span><input type="search" id="search-input" autocomplete="off" placeholder="例如所有權、Future 或 E0382"></label>
+  <p id="search-status" role="status"></p><ul id="search-results"></ul>
+</dialog>
+<main id="main">{{body}}</main>
+<script type="application/json" id="page-data">{{pageData}}</script>
+</body>
+</html>

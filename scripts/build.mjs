@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { catalog, chapters, md, projectRoot, readLesson } from '../src/course.mjs';
 import { makeSite } from '../src/site.mjs';
+import { renderNativeBodies, renderNativeLayouts } from '../src/native-render.mjs';
 
 const inputBase = process.env.BASE_PATH || '/';
 if (!/^\/(?:[\w.-]+\/)*[\w.-]*\/?$/.test(inputBase) || inputBase.startsWith('//') || inputBase.split('/').some(segment => ['.', '..'].includes(segment))) {
@@ -17,6 +18,7 @@ execFileSync(process.env.CARGO || 'cargo', [
   ...chapters.map(entry => 'content/' + entry.slug + '.md'),
 ], { cwd: projectRoot, stdio: 'inherit' });
 const lessons = await Promise.all(catalog.map(readLesson));
+const renderReport = renderNativeBodies(lessons);
 
 // Keep Markdown parsing in the existing renderer for now. Native Rust owns
 // the search index's JSON schema and heading selection.
@@ -37,6 +39,17 @@ const searchIndex = execFileSync(process.env.CARGO || 'cargo', [
   maxBuffer: 32 * 1024 * 1024, stdio: ['pipe', 'pipe', 'inherit'],
 });
 
+// Native Rust constructs the HTML document shell for every route. Keep the
+// previous layout as an exact-output oracle until migration is established.
+const nativeSite = makeSite(base, {nativeLayout: true});
+const pagePaths = ['index.html', 'resources/index.html', '404.html', ...lessons.map(l => l.entry.path + '/index.html')];
+const specs = [nativeSite.home(), nativeSite.resourceIndex(), nativeSite.missing(), ...lessons.map(nativeSite.lesson)];
+const baseline = [site.home(), site.resourceIndex(), site.missing(), ...lessons.map(site.lesson)];
+const pages = renderNativeLayouts(base, specs);
+for (let i = 0; i < pages.length; i++) {
+  if (pages[i] !== baseline[i]) throw new Error('Rust 頁面模板與原版不一致：' + pagePaths[i]);
+}
+
 async function write(path, contents) {
   const target = join(dist, path);
   await mkdir(dirname(target), { recursive: true });
@@ -47,14 +60,12 @@ await rm(dist, { recursive: true, force: true });
 await mkdir(dist, { recursive: true });
 await cp(join(projectRoot, 'src/assets'), join(dist, 'assets'), { recursive: true });
 await Promise.all([
-  write('index.html', site.home()),
-  write('resources/index.html', site.resourceIndex()),
-  write('404.html', site.missing()),
+  ...pagePaths.map((path,i) => write(path, pages[i])),
   write('.nojekyll', ''),
-  ...lessons.map(lesson => write(`${lesson.entry.path}/index.html`, site.lesson(lesson))),
   write('assets/search-index.json', searchIndex),
   write('third-party-licenses.txt', (await Promise.all(['markdown-it','highlight.js'].map(async name =>
     `${name}\n${await readFile(join(projectRoot,'node_modules',name,'LICENSE'), 'utf8')}`))).join('\n\n')),
 ]);
 
-console.log(`Built ${lessons.length + 3} HTML pages at ${base} (MarkdownIt + Rust search index)`);
+await write('build-render-report.json', JSON.stringify({layout: 'rust', pages: pages.length, markdown: renderReport}, null, 2));
+console.log(`Built ${pages.length} HTML pages at ${base} (Rust layout and search index)`);
