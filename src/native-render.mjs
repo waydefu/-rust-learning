@@ -263,3 +263,9 @@ export function verifyNativeExamples(lessons) {
   }
   return {version,compiled:Number(compiled),run:Number(run),error:Number(error),project:Number(project),messages};
 }
+
+export function verifyNativeSite(pages, fields) {
+  const result=invoke('site-check-v1',pages,fields);
+  if(result.length!==4||result.some(value=>!/^\d+$/.test(value)))throw new Error('Rust 網站驗證回傳格式不一致');
+  return result.map(Number);
+}

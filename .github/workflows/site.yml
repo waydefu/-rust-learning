@@ -41,11 +41,11 @@ jobs:
           path: .migration-evidence/
           include-hidden-files: true
           if-no-files-found: ignore
-      - run: npm run build && npm run check
+      - run: npm run build && node scripts/migration/compare-site-check.mjs
       - name: Rust 範例執行器與原版對照
         run: node scripts/migration/compare-examples.mjs
       - run: npx playwright install --with-deps chromium
-      - run: npm run build && npm run check && npm run test:browser
+      - run: npm run build && node scripts/migration/compare-site-check.mjs && npm run test:browser
         env:
           BASE_PATH: /-rust-learning/
       - name: 驗證 Rust 本機預覽伺服器
