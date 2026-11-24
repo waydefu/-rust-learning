@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { parseFragment } from 'parse5';
-import { md, projectRoot, renderTokens } from './course.mjs';
+import { md, projectRoot, renderTokens, resources, stages } from './course.mjs';
 import { icon } from './icons.mjs';
 import { isDeepStrictEqual } from 'node:util';
 
@@ -102,4 +102,65 @@ export function renderNativeLayouts(base, specs) {
   const result = invoke('layout-v1', specs.length, fields);
   if (result.length !== specs.length) throw new Error('Rust 頁面模板回傳數量不正確');
   return result;
+}
+
+
+// Rust extracts headings directly from source, then computes public anchors.
+// The legacy parser's token offsets are retained for the old renderer.
+export function applyNativeMetadata(lessons) {
+  const result = invoke('metadata-v1', lessons.length, lessons.map(lesson => lesson.source));
+  let cursor = 0;
+  let total = 0;
+  for (const lesson of lessons) {
+    const title = result[cursor++];
+    const count = Number(result[cursor++]);
+    if (title !== lesson.title || count !== lesson.headings.length) {
+      throw new Error('Rust 章節標題數量或名稱不一致：' + lesson.entry.slug);
+    }
+    const headings = [];
+    for (const old of lesson.headings) {
+      const level = Number(result[cursor++]);
+      const label = result[cursor++];
+      const id = result[cursor++];
+      if (level !== old.level || label !== old.label || id !== old.id) {
+        throw new Error('Rust 錨點與原版不一致：' + lesson.entry.slug + ' / ' + old.label);
+      }
+      headings.push({level,label,id,tokenIndex:old.tokenIndex});
+      total++;
+    }
+    lesson.title = title;
+    lesson.headings = headings;
+  }
+  if (cursor !== result.length) throw new Error('Rust 章節元資料含多餘欄位');
+  console.log('Rust 章節元資料：' + lessons.length + ' 篇、' + total + ' 個錨點逐項比對通過');
+}
+
+export function nativeAnchors(groups) {
+  const result = invoke('anchors-v1', groups.length, groups.flatMap(labels => [String(labels.length), ...labels]));
+  let cursor = 0;
+  const output = groups.map(labels => {
+    if (Number(result[cursor++]) !== labels.length) throw new Error('Rust 錨點數量不一致');
+    const ids = result.slice(cursor, cursor + labels.length);
+    cursor += labels.length;
+    return ids;
+  });
+  if (cursor !== result.length) throw new Error('Rust 錨點資料不一致');
+  return output;
+}
+
+export function applyNativeNavigation(base, specs) {
+  const fields = [base, String(resources.length), icon('home',19), icon('route',19),
+    icon('layers',19), icon('down',16), icon('check',14), String(stages.length)];
+  for (const stage of stages) {
+    fields.push(stage.id,stage.title,String(stage.chapters.length));
+    for (const entry of stage.chapters) fields.push(entry.id,entry.path,entry.title);
+  }
+  for (const spec of specs) fields.push(spec.current,spec.id);
+  const result = invoke('navigation-v1',specs.length,fields);
+  if (result.length !== specs.length) throw new Error('Rust 導覽數量不一致');
+  for (let i=0;i<specs.length;i++) {
+    if (result[i] !== specs[i].navigation) throw new Error('Rust 導覽與原版不一致：' + specs[i].current);
+    specs[i].navigation = result[i];
+  }
+  console.log('Rust 導覽逐字比對：' + specs.length + ' 頁通過');
 }

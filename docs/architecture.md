@@ -10,7 +10,7 @@ CommonMark 可以直接在 GitHub 與 HackMD 編輯。技術圖解使用同庫 S
 
 ## Rust 化的演進方向
 
-目前是混合式建置：Rust 負責教材預檢、搜尋索引、本機 HTTP 預覽、CommonMark 正文候選與共用 HTML 文件模板；Node.js 仍負責穩定錨點、語法高亮、頁面內容元件、舊渲染器及相容性比對。後續可移植章節資料、導覽、互動元件的靜態模板、語法高亮及教材範例抽取；只有在相容性報告確認後才能移除舊工具。GitHub Pages 只接受靜態輸出，因此不需要改成持續運作的 Rust HTTP 伺服器。瀏覽器中的互動仍使用少量 JavaScript，只有適合的計算模組才評估 Rust/Wasm。維持既有網址、錨點、HackMD 編輯方式及瀏覽器學習紀錄。尚未完成全站 Rust 移植。
+目前是混合式建置：Rust 負責教材預檢、搜尋索引、本機 HTTP 預覽、CommonMark 正文候選與共用 HTML 文件模板；Rust 亦從 Markdown 產生章節標題、Unicode 錨點與共用側欄導覽，逐項或逐字與舊版比對。Node.js 仍負責 catalog JSON 讀取、搜尋全文、語法高亮、部分頁面內容元件、舊渲染器及相容性比對。後續可移植章節資料、導覽、互動元件的靜態模板、語法高亮及教材範例抽取；只有在相容性報告確認後才能移除舊工具。GitHub Pages 只接受靜態輸出，因此不需要改成持續運作的 Rust HTTP 伺服器。瀏覽器中的互動仍使用少量 JavaScript，只有適合的計算模組才評估 Rust/Wasm。維持既有網址、錨點、HackMD 編輯方式及瀏覽器學習紀錄。尚未完成全站 Rust 移植。
 
 ### Rust 正文與 HTML 模板
 
