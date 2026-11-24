@@ -8,7 +8,22 @@ version=v4.0.0
 asset="rust-anything-$version-x86_64-unknown-linux-gnu"
 digest=6ca6e017f7a1dc1f870236c3200c6163ee9dfb331eebe541e9b28ba60a98d4d2
 scratch="$(mktemp -d)"
-trap 'rm -rf "$scratch"' EXIT
+# Preserve synthetic test evidence even when recording or replay fails.
+finish() {
+  status=$?
+  trap - EXIT
+  set +e
+  mkdir -p "$root/.migration-evidence"
+  for file in record.json original.json rust.json inputs.jsonl; do
+    if [ -f "$scratch/$file" ]; then cp "$scratch/$file" "$root/.migration-evidence/"; fi
+  done
+  if [ -d "$scratch/recording/rust/app-cases" ]; then
+    cp -r "$scratch/recording/rust/app-cases" "$root/.migration-evidence/app-cases"
+  fi
+  rm -rf "$scratch"
+  exit "$status"
+}
+trap finish EXIT
 mkdir -p "$scratch/tool" "$scratch/recording"
 curl --fail --silent --show-error --location --retry 3 --max-time 90 \
   "https://github.com/erkamyaman/rust-anything/releases/download/$version/$asset.tar.gz" \
@@ -35,7 +50,3 @@ for result in original rust; do
   jq -e --argjson n "$expected" '.total == $n and .passed == $n and .skipped == 0 and (.failures | length) == 0 and ((.fallback.cases // 0) == 0)' "$scratch/$result.json"
 done
 cat "$scratch/recording/rust/app-cases/replay-report.md"
-# Evidence stays outside dist and is retained as a CI artifact.
-mkdir -p "$root/.migration-evidence"
-cp "$scratch/record.json" "$scratch/original.json" "$scratch/rust.json" "$scratch/inputs.jsonl" "$root/.migration-evidence/"
-cp -r "$scratch/recording/rust/app-cases" "$root/.migration-evidence/app-cases"
