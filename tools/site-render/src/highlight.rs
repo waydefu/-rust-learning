@@ -170,7 +170,7 @@ fn toml(source:&str)->String{
     out
 }
 
-fn highlight(lang:&str,source:&str)->String{
+pub(super) fn highlight(lang:&str,source:&str)->String{
     if lang=="bash"{return bash(source)}
     if lang=="toml"{return toml(source)}
     if !matches!(lang,"rust"|"bash"|"toml"){return escape(source)}
@@ -221,7 +221,7 @@ fn highlight(lang:&str,source:&str)->String{
     }
     out
 }
-fn block(info:&str,highlighted:&str,icon:&str)->String{
+pub(super) fn block(info:&str,highlighted:&str,icon:&str)->String{
     let mut parts=info.split_whitespace();
     let language=parts.next().unwrap_or("");
     let mode=parts.next().unwrap_or("");

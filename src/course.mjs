@@ -6,6 +6,7 @@ import rust from 'highlight.js/lib/languages/rust';
 import bash from 'highlight.js/lib/languages/bash';
 import toml from 'highlight.js/lib/languages/ini';
 import { icon } from './icons.mjs';
+import { siteData } from './site-data.mjs';
 
 hljs.registerLanguage('rust', rust);
 hljs.registerLanguage('bash', bash);
@@ -15,12 +16,7 @@ export const projectRoot = fileURLToPath(new URL('../', import.meta.url));
 export const catalog = JSON.parse(await readFile(new URL('../content/catalog.json', import.meta.url), 'utf8'));
 export const chapters = catalog.filter(item => /^\d{2}$/.test(item.id));
 export const resources = catalog.filter(item => /^A\d{2}$/.test(item.id));
-export const stages = [
-  { id: 'fundamentals', title: '入門與所有權', icon: 'terminal', description: '從第一支程式出發，理解變數、控制流程與記憶體。' },
-  { id: 'modeling', title: '資料建模與錯誤', icon: 'box', description: '用型別描述狀態，組織程式並處理可預期的失敗。' },
-  { id: 'engineering', title: '抽象與工程實作', icon: 'branch', description: '透過 Trait、測試與實作，寫出可重用、可維護的程式。' },
-  { id: 'systems', title: '並行與系統開發', icon: 'cpu', description: '掌握資源共享與排程，完成一個多執行緒伺服器。' },
-].map(stage => ({ ...stage, chapters: chapters.filter(item => item.group === stage.id) }));
+export const stages = siteData.stages.map(stage => ({ ...stage, chapters: chapters.filter(item => item.group === stage.id) }));
 
 export const escape = value => String(value).replace(/[&<>"']/g, character => ({
   '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;',

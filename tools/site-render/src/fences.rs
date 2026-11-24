@@ -19,7 +19,7 @@ fn valid(info:&str)->bool{
         _=>false,
     }
 }
-fn extract(source:&str)->Result<Vec<(String,String)>>{
+pub(super) fn extract(source:&str)->Result<Vec<(String,String)>>{
     let mut result=Vec::new();
     let mut active:Option<(String,String)>=None;
     for event in Parser::new_ext(source,Options::ENABLE_TABLES|Options::ENABLE_STRIKETHROUGH){

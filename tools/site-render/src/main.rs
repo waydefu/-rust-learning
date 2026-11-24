@@ -12,6 +12,7 @@ mod highlight;
 mod fences;
 mod examples;
 mod site_check;
+mod native;
 
 type Result<T> = std::result::Result<T, String>;
 const LIMIT: u64 = 64 * 1024 * 1024;
@@ -264,7 +265,9 @@ fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
 }
 
 fn main() -> ExitCode {
-    match run() {
+    let args:Vec<String>=std::env::args().skip(1).collect();
+    let result=if args.is_empty(){run().map_err(|e|e.to_string())}else{native::run(&args)};
+    match result {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => { eprintln!("site-render: {error}"); ExitCode::FAILURE }
     }
