@@ -39,7 +39,8 @@ jobs:
         if: always()
         with:
           name: approved-output-evidence
-          path: test-results/regression/
+          path: .regression-evidence/
+          include-hidden-files: true
           if-no-files-found: error
       - name: 驗證 Rust 本機預覽伺服器
         env:
@@ -63,6 +64,14 @@ jobs:
           test "$(curl --silent --show-error --max-time 10 --output /dev/null --write-out '%{http_code}' "$url/chapters/ownership")" = 308
           test "$(curl --silent --show-error --max-time 10 --output /dev/null --write-out '%{http_code}' "$url/not-here/")" = 404
           test "$(curl --path-as-is --silent --show-error --max-time 10 --output /dev/null --write-out '%{http_code}' "$url/%2e%2e/README.md")" = 404
+          TEST_ORIGIN="$url/" node scripts/regression/measure-mobile.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mobile-performance
+          path: .quality-evidence/mobile-performance.json
+          include-hidden-files: true
+          if-no-files-found: error
 
   native_only:
     name: 無 Node 的 Rust CLI 驗證
@@ -151,10 +160,37 @@ jobs:
       - name: 無網路、唯讀、非 root 容器執行
         run: bash scripts/regression/check-sandbox.sh
 
+  rust_coverage:
+    name: Rust 測試覆蓋率
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - run: rustup component add llvm-tools-preview
+      - run: cargo +stable install --locked --version 0.6.21 cargo-llvm-cov
+      - name: 單元測試與原生建置檢查覆蓋率
+        shell: bash
+        run: |
+          mkdir -p .quality-evidence
+          cargo llvm-cov --locked --workspace --manifest-path tools/Cargo.toml --no-report
+          BASE_PATH=/-rust-learning/ cargo llvm-cov run --no-report --locked --manifest-path tools/site-render/Cargo.toml -- build
+          BASE_PATH=/-rust-learning/ cargo llvm-cov run --no-report --locked --manifest-path tools/site-render/Cargo.toml -- check
+          cargo llvm-cov report --manifest-path tools/Cargo.toml --json --output-path .quality-evidence/coverage.json
+          cargo llvm-cov report --manifest-path tools/Cargo.toml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rust-coverage
+          path: .quality-evidence/coverage.json
+          include-hidden-files: true
+          if-no-files-found: error
+
   build_pages:
     name: 建置與上傳 Pages 產物
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    needs: [verify, native_only, cross_browser, rust_quality, sandbox_examples]
+    needs: [verify, native_only, cross_browser, rust_quality, sandbox_examples, rust_coverage]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

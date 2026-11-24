@@ -32,7 +32,7 @@ const reference=JSON.parse(historical)[base];
 if (!reference || reference.base!==base) throw new Error('No approved output baseline for '+base);
 const expected=new Map(reference.hashes.map(({path,sha256})=>[path,sha256]));
 const current=new Map(actual);
-const candidateDir=join(projectRoot,'test-results/regression');
+const candidateDir=join(projectRoot,'.regression-evidence');
 await mkdir(candidateDir,{recursive:true});
 await writeFile(join(candidateDir,base==='/'?'root.json':'pages.json'),
   JSON.stringify({base,files:actual.length,hashes:actual.map(([path,sha256])=>({path,sha256}))},null,2)+'\n');

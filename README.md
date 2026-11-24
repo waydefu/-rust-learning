@@ -74,3 +74,7 @@ GitHub 目前可查到名稱含前導連字號的 [waydefu/-rust-learning](https
 所有 `rust run` 範例須宣告 stdout 契約（`// 預期輸出: 文字` 或 `// 預期無輸出`）。執行器分離 stdout/stderr，限制輸出、逾時及繼承環境變數，Unix 逾時終止程序群組。本機直接 `check-rust` 仍只適用可信任教材。
 
 Linux Docker 環境執行 `bash scripts/regression/check-sandbox.sh`，先取得鎖定的依賴，再在無外網、唯讀根檔案系統、非 root、移除 capabilities、限制 CPU/記憶體/PID、僅有 tmpfs 可寫且無主機目錄掛載的容器中驗證全部教材。CI 將此列為發布關卡；仍信任 Docker 基礎映像與編譯器，不是對敵意程式的絕對安全保證。
+
+### 量測與維護
+
+CI 產生 `rust-coverage`（單元測試及原生 CLI build/check，並非所有程式路徑）與 `mobile-performance`（Pixel 7 模擬、冷快取、4 倍 CPU 降速、150ms 延遲、1.6Mbps 下載/0.75Mbps 上傳，每頁三次的中位數）報告。效能數值受 CI 主機影響，不冒充實機或穩定場域資料；資源大小的 160 kB 預算仍為硬性檢查。儲存庫管理及實機驗收見 [維護說明](docs/maintenance.md)。

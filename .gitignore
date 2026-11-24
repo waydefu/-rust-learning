@@ -8,5 +8,6 @@ tools/target/
 # Ignore pre-workspace build directories in existing clones.
 tools/*/target/
 
-.migration-evidence/
+.regression-evidence/
+.quality-evidence/
 .site-write-*/
