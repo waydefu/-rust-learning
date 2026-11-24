@@ -93,7 +93,7 @@ export async function readLesson(entry) {
   }
   const fullText = tokens.filter(token => token.type === 'inline' || token.type === 'fence')
     .map(token => token.type === 'fence' ? token.content : plain(token)).join(' ').replace(/\s+/g, ' ');
-  return { entry, title: plain(title), tokens: tokens.slice(3), headings, fullText, searchTitle: title.content };
+  return { entry, source, title: plain(title), tokens: tokens.slice(3), headings, fullText, searchTitle: title.content };
 }
 
 export function renderTokens(tokens) {

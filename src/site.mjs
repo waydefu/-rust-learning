@@ -7,7 +7,7 @@ export const siteName = 'Rust 學習工坊';
 
 const safeJSON = data => JSON.stringify(data).replaceAll('<', '\\u003c');
 
-export function makeSite(base) {
+export function makeSite(base, {nativeLayout = false} = {}) {
   const url = (path = '') => path ? `${base}${path}/` : base;
   const asset = name => `${base}assets/${name}`;
   const chapterName = entry => entry.id.startsWith('A') ? entry.id : `第 ${Number(entry.id)} 章`;
@@ -29,6 +29,10 @@ export function makeSite(base) {
   }
 
   function layout({current, id = '', title, description, body, data = {}}) {
+    if (nativeLayout) return {
+      title, description, navigation: navigation(current,id), body,
+      pageData: safeJSON({base, chapterPaths: chapters.map(entry => [entry.id, entry.path]), ...data}),
+    };
     return `<!doctype html>
 <html lang="zh-Hant">
 <head>
@@ -116,7 +120,7 @@ export function makeSite(base) {
     return layout({current:'resources', title:'延伸資源', description:'八份 Rust 延伸教材與推理題庫。',body});
   }
 
-  function lesson({entry, title, tokens, headings}) {
+  function lesson({entry, title, tokens, headings, nativeBody}) {
     const index = chapters.indexOf(entry);
     const isChapter = index !== -1;
     const isResource = resources.includes(entry);
@@ -127,8 +131,10 @@ export function makeSite(base) {
     const flow = conceptFlow(entry.slug);
     const isOwnership = entry.slug === 'ownership';
     const firstSection = headings[0]?.tokenIndex - 3;
-    const firstPart = flow ? renderTokens(tokens.slice(0, firstSection)) : '';
-    const rest = flow ? renderTokens(tokens.slice(firstSection)) : renderTokens(tokens);
+    const firstPart = flow ? (nativeBody?.intro ?? renderTokens(tokens.slice(0, firstSection))) : '';
+    const rest = nativeBody
+      ? (flow ? nativeBody.rest : nativeBody.intro + nativeBody.rest)
+      : (flow ? renderTokens(tokens.slice(firstSection)) : renderTokens(tokens));
     const outline = `<ul>${isOwnership ? '<li><a href="#ownership-lab">互動記憶體圖</a></li>' : ''}${headings.filter(heading => heading.level === 2).map(heading => `<li><a href="#${escape(heading.id)}">${escape(heading.label)}</a></li>`).join('')}${isChapter ? '<li><a href="#quick-check">自我測驗</a></li>' : ''}</ul>`;
     const isOutline = entry.slug === 'outline';
     const outlineLinks = isOutline ? `<section class="outline-links"><h2>網站章節索引</h2>${stages.map(item => `<h3>${item.title}</h3><ol>${item.chapters.map(chapter => `<li><a href="${url(chapter.path)}">${chapterName(chapter)}　${chapter.title}</a></li>`).join('')}</ol>`).join('')}<p><a href="${url('resources')}">瀏覽延伸教材</a></p></section>` : '';

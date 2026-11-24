@@ -1,0 +1,105 @@
+import { execFileSync } from 'node:child_process';
+import { parseFragment } from 'parse5';
+import { md, projectRoot, renderTokens } from './course.mjs';
+import { icon } from './icons.mjs';
+import { isDeepStrictEqual } from 'node:util';
+
+function invoke(mode, count, fields) {
+  const input = [mode, String(count), ...fields];
+  if (input.some(value => typeof value !== 'string' || value.includes('\0'))) {
+    throw new Error('Rust 渲染介面不接受非文字或 NUL 欄位');
+  }
+  const output = execFileSync(process.env.CARGO || 'cargo', [
+    'run', '--quiet', '--locked', '--manifest-path', 'tools/site-render/Cargo.toml',
+  ], {
+    cwd: projectRoot, input: input.join('\0') + '\0', encoding: 'utf8',
+    stdio: ['pipe', 'pipe', 'inherit'], maxBuffer: 64 * 1024 * 1024,
+  });
+  const result = output.split('\0');
+  if (result.pop() !== '' || result.shift() !== mode || result.shift() !== String(count)) {
+    throw new Error('Rust 渲染回傳格式不相容');
+  }
+  return result;
+}
+
+// Compare parsed DOM, not formatting whitespace between block-level tags.
+// Text inside pre/code is exact. Inline whitespace and every tag/attribute
+// are preserved (apart from normalization of HTML formatting whitespace).
+const blocks = new Set(['address','article','aside','blockquote','div','dl','dt','dd',
+  'figcaption','figure','footer','h1','h2','h3','h4','h5','h6','header','hr',
+  'li','main','nav','ol','p','pre','section','table','thead','tbody','tfoot','tr','td','th','ul']);
+function normalized(node, exact = false) {
+  if (node.nodeName === '#text') return node.value;
+  if (node.nodeName === '#comment') return ['#comment', node.data];
+  const tag = node.tagName || node.nodeName;
+  const attrs = (node.attrs || []).map(({name,value}) => [name,
+    name === 'style' ? value.replace(/\s+/g,'').replace(/;$/,'') : value,
+  ]).sort((a,b) => a[0].localeCompare(b[0]));
+  const preserve = exact || tag === 'pre' || tag === 'code';
+  const children = [];
+  for (const child of node.childNodes || []) {
+    const item = normalized(child, preserve);
+    if (typeof item === 'string' && typeof children.at(-1) === 'string') children[children.length - 1] += item;
+    else children.push(item);
+  }
+  const isBlock = child => Array.isArray(child) && blocks.has(child[0]);
+  if (!preserve) {
+    for (let i = 0; i < children.length; i++) {
+      if (typeof children[i] !== 'string') continue;
+      let value = children[i].replace(/\s+/gu, ' ');
+      if (i === 0 || isBlock(children[i - 1])) value = value.trimStart();
+      if (i === children.length - 1 || isBlock(children[i + 1])) value = value.trimEnd();
+      children[i] = value;
+    }
+  }
+  return [tag, attrs, children.filter(child => child !== '')];
+}
+
+export const equivalentMarkup = (a, b) =>
+  isDeepStrictEqual(normalized(parseFragment(a)), normalized(parseFragment(b)));
+
+export function renderNativeBodies(lessons) {
+  const fields = [];
+  for (const lesson of lessons) {
+    fields.push(lesson.source, String(lesson.headings.length));
+    for (const h of lesson.headings) fields.push(String(h.level), h.id);
+    const fences = lesson.tokens.filter(token => token.type === 'fence');
+    fields.push(String(fences.length));
+    for (const token of fences) {
+      fields.push(token.info.trim(), token.content, md.renderer.rules.fence([token], 0));
+    }
+  }
+  const result = invoke('markdown-v1', lessons.length, fields);
+  if (result.length !== lessons.length * 3) throw new Error('Rust 正文回傳數量不正確');
+  const report = [];
+  for (let i = 0; i < lessons.length; i++) {
+    const lesson = lessons[i];
+    const [status, intro, rest] = result.slice(i * 3, i * 3 + 3);
+    const legacy = renderTokens(lesson.tokens);
+    const compatible = status === 'ok' && equivalentMarkup(legacy, intro + rest);
+    if (compatible) lesson.nativeBody = {intro, rest};
+    report.push({
+      slug: lesson.entry.slug,
+      renderer: compatible ? 'rust' : 'legacy',
+      reason: compatible ? '' : status === 'error' ? intro : 'DOM 與既有渲染器不同',
+    });
+  }
+  const fallback = report.filter(item => item.renderer !== 'rust');
+  console.log('Rust Markdown 渲染相容：' + (report.length - fallback.length) + '/' + report.length);
+  for (const {slug, reason} of fallback) console.warn('保留既有渲染：' + slug + ' — ' + reason);
+  if (fallback.length === report.length || (fallback.length && process.env.REQUIRE_NATIVE_MARKDOWN === '1')) {
+    throw new Error('Rust Markdown 尚未達到指定相容性要求');
+  }
+  return report;
+}
+
+export function renderNativeLayouts(base, specs) {
+  const fields = [
+    base, icon('menu'), icon('search',19), icon('sun'), icon('moon'),
+    icon('github'), icon('close'), icon('search'),
+  ];
+  for (const spec of specs) fields.push(spec.title, spec.description, spec.navigation, spec.body, spec.pageData);
+  const result = invoke('layout-v1', specs.length, fields);
+  if (result.length !== specs.length) throw new Error('Rust 頁面模板回傳數量不正確');
+  return result;
+}

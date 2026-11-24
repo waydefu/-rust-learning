@@ -7,3 +7,5 @@ test-results/
 tools/lesson-check/target/
 
 tools/site-tools/target/
+
+tools/site-render/target/

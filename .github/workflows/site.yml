@@ -27,6 +27,7 @@ jobs:
       - run: rustup show
       - run: cargo test --locked --manifest-path tools/lesson-check/Cargo.toml
       - run: cargo test --locked --manifest-path tools/site-tools/Cargo.toml
+      - run: cargo test --locked --manifest-path tools/site-render/Cargo.toml
       - run: npm run build && npm run check
       - run: npm run check:rust
       - run: npx playwright install --with-deps chromium
@@ -149,3 +150,5 @@ jobs:
           done
           grep -Fq '.lesson-callout' /tmp/rust-site.css
           test -s /tmp/rust-site.css
+          curl --fail --silent --show-error --retry 4 --retry-all-errors --retry-delay 2 --max-time 20 "$endpoint/build-render-report.json" -o /tmp/rust-render-report.json
+          jq -e '.layout == "rust" and .pages == 34 and (.markdown | length) == 31' /tmp/rust-render-report.json
