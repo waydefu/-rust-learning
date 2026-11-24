@@ -188,4 +188,4 @@ jobs:
           grep -Fq '.lesson-callout' /tmp/rust-site.css
           test -s /tmp/rust-site.css
           curl --fail --silent --show-error --retry 4 --retry-all-errors --retry-delay 2 --max-time 20 "$endpoint/build-render-report.json" -o /tmp/rust-render-report.json
-          jq -e '.layout == "rust" and .pages == 34 and (.markdown | length) == 31 and all(.markdown[]; .renderer == "rust")' /tmp/rust-render-report.json
+          jq -e '.layout == "rust" and .pages == 34 and (.markdown | length) == 31 and all(.markdown[]; .renderer == "rust") and .highlight.renderer == "rust" and .highlight.total > 0 and .highlight.native == .highlight.total and .highlight.fallback == 0' /tmp/rust-render-report.json

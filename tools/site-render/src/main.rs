@@ -1,5 +1,5 @@
-//! Native static rendering. The Node bridge supplies stable anchors and highlighted
-//! code blocks while Rust takes ownership of CommonMark body rendering and layout.
+//! Native static rendering, highlighting, document templates and verification.
+//! The Node bridge supplies structured facts and checks the old output.
 use pulldown_cmark::{html, CodeBlockKind, CowStr, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 use std::{collections::HashMap, io::{self, Read, Write}, process::ExitCode};
 
@@ -119,7 +119,7 @@ fn markdown(source: &str, headings: &[Heading<'_>], fences: &[Fence<'_>]) -> Res
                 if i == events.len() || info.trim() != expected.info || code != expected.code {
                     return Err("Rust 程式區塊與原有解析結果不同".into());
                 }
-                // This HTML comes only from the existing trusted, escaping highlighter.
+                // This HTML comes from the trusted, escaping Rust highlighter.
                 out.push(raw(expected.rendered.to_owned()));
                 fence_index += 1;
             }
@@ -216,7 +216,7 @@ fn process(input: &str) -> Result<Vec<u8>> {
         "landing-v1" => landing::process_landing(n, &mut fields, &mut result)?,
         "reader-v1" => reader::process_reader(n, &mut fields, &mut result)?,
         "page-data-v1" => page_data::process_data(n, &mut fields, &mut result)?,
-        "highlight-v1" => highlight::process_highlight(n, &mut fields, &mut result)?,
+        "highlight-v2" => highlight::process_highlight(n, &mut fields, &mut result)?,
         "fences-v1" => fences::process_fences(n, &mut fields, &mut result)?,
         "examples-v1" => examples::process_examples(n, &mut fields, &mut result)?,
         "site-check-v1" => site_check::process_site_check(n, &mut fields, &mut result)?,

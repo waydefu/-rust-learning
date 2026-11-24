@@ -48,6 +48,7 @@ pub(super) fn process_site_check<'a>(n:usize,f:&mut impl Iterator<Item=&'a str>,
         ||!base.bytes().all(|b|b.is_ascii_alphanumeric()||b"/_.-".contains(&b))
         ||base.split('/').any(|p|matches!(p,"."|"..")){return Err("BASE_PATH 無效".into())}
     let mut errors=Vec::new();
+    let mut total_fences=0usize;
     let mut lessons=Vec::new();let(mut ids,mut slugs,mut paths)=(Vec::new(),Vec::new(),Vec::new());
     let(mut chapter_ids,mut resource_ids)=(Vec::new(),Vec::new());
     for _ in 0..count(f,1000)?{
@@ -69,7 +70,9 @@ pub(super) fn process_site_check<'a>(n:usize,f:&mut impl Iterator<Item=&'a str>,
             if next>level+1{errors.push(format!("{slug} 標題層級跳躍 {label}"))}
             level=next;
         }
-        for _ in 0..count(f,5000)?{
+        let fence_count=count(f,5000)?;
+        total_fences+=fence_count;
+        for _ in 0..fence_count{
             let line=count(f,1_000_000)?;let markup=field(f)?;let ending=field(f)?.trim();
             if markup.is_empty()||!ending.starts_with(markup)||!ending.chars().all(|c|Some(c)==markup.chars().next()){
                 errors.push(format!("{slug}.md:{line} 缺少程式碼結尾"));
@@ -142,6 +145,8 @@ pub(super) fn process_site_check<'a>(n:usize,f:&mut impl Iterator<Item=&'a str>,
         has_rust |= renderer=="rust";
     }
     if !report_valid||!has_rust{errors.push("Rust 渲染報告不完整".into())}
+    let renderer=field(f)?;let native=count(f,100_000)?;let total=count(f,100_000)?;let fallback=count(f,100_000)?;
+    if renderer!="rust"||native!=total||total!=total_fences||fallback!=0{errors.push("Rust 高亮報告未達零回退".into())}
     let shape_valid=flag(f)?;
     let expected_index=read_index(f)?;
     let index=read_index(f)?;

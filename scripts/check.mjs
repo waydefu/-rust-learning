@@ -61,6 +61,8 @@ for(const name of names){
 const report=JSON.parse(await readFile(join(dist,'build-render-report.json'),'utf8'));
 fields.push(report.layout,String(report.pages),String(report.markdown.length));
 for(const item of report.markdown) fields.push(item.slug,item.renderer);
+const high=report.highlight??{};
+fields.push(high.renderer??'',String(high.native??0),String(high.total??0),String(high.fallback??1));
 const index=JSON.parse(await readFile(join(dist,'assets','search-index.json'),'utf8'));
 // Convert JSON values to typed transport fields; Rust decides equality.
 const hasKeys=(value,keys)=>value!==null&&typeof value==='object'&&!Array.isArray(value)&&

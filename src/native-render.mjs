@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { parseFragment } from 'parse5';
-import { md, projectRoot, renderTokens, chapters, resources, stages, highlightCode } from './course.mjs';
+import { md, projectRoot, renderTokens, chapters, resources, stages } from './course.mjs';
 import { icon } from './icons.mjs';
 import { flows, quizzes, ownershipSteps } from './learning-labs.mjs';
 import { isDeepStrictEqual } from 'node:util';
@@ -66,7 +66,7 @@ export function renderNativeBodies(lessons) {
   for (const lesson of lessons) {
     fields.push(lesson.source, String(lesson.headings.length));
     for (const h of lesson.headings) fields.push(String(h.level), h.id);
-    const fences = lesson.tokens.filter(token => token.type === 'fence');
+    const fences = lesson.nativeFences;
     fields.push(String(fences.length));
     for (const token of fences) {
       fields.push(token.info.trim(), token.content, codeReport.blocks[fenceIndex++]);
@@ -93,7 +93,8 @@ export function renderNativeBodies(lessons) {
   if (fallback.length === report.length || (fallback.length && process.env.REQUIRE_NATIVE_MARKDOWN === '1')) {
     throw new Error('Rust Markdown 尚未達到指定相容性要求');
   }
-  return report;
+  const {blocks, ...highlight} = codeReport;
+  return {markdown:report,highlight};
 }
 
 export function renderNativeLayouts(base, specs) {
@@ -221,30 +222,30 @@ export function applyNativeReaders(base, specs, lessons) {
 }
 
 export function applyNativeHighlighting(lessons) {
-  const locations = lessons.flatMap(lesson => lesson.tokens.filter(token => token.type === 'fence').map(token=>({slug:lesson.entry.slug,token})));
-  const tokens = locations.map(item=>item.token);
-  const fields = [icon('copy',16)];
-  for (const token of tokens) fields.push(token.info.trim(),token.content,highlightCode(token));
-  const output = invoke('highlight-v1',tokens.length,fields);
-  if(output.length!==tokens.length*2) throw new Error('Rust 程式區塊回傳數量不一致');
-  let native=0;
-  const byLanguage=new Map();
-  const blocks=tokens.map((token,i)=>{
-    const language=token.info.split(/\s+/)[0];
+  const locations=lessons.flatMap(lesson=>lesson.nativeFences.map(token=>({slug:lesson.entry.slug,token})));
+  const tokens=locations.map(item=>item.token);
+  const fields=[icon('copy',16),...tokens.flatMap(token=>[token.info.trim(),token.content])];
+  // The native renderer receives only source and trusted icon data, never the legacy HTML.
+  const blocks=invoke('highlight-v2',tokens.length,fields);
+  if(blocks.length!==tokens.length)throw new Error('Rust 程式區塊回傳數量不一致');
+  const byLanguage=new Map(), mismatches=[];
+  for(let i=0;i<tokens.length;i++){
+    const token=tokens[i],language=token.info.split(/\s+/)[0];
     const stats=byLanguage.get(language)??{native:0,total:0};
     stats.total++;byLanguage.set(language,stats);
-    const original=md.renderer.rules.fence([token],0);
-    const [candidate,wrapped]=output.slice(i*2,i*2+2);
-    if(wrapped!==original) throw new Error('Rust 程式區塊外框不相容：'+token.info);
-    if(candidate===original){native++;stats.native++;return candidate;}
-    const j=[...candidate].findIndex((c,k)=>c!==[...original][k]);
-    const at=j<0?Math.min(candidate.length,original.length):j;
-    console.log('Rust 高亮差異 '+locations[i].slug+':'+(token.map[0]+1)+' '+token.info+' '+JSON.stringify({code:token.content,candidate:candidate.slice(Math.max(0,at-60),at+180),reference:original.slice(Math.max(0,at-60),at+180)}));
-    return wrapped;
-  });
-  console.log('Rust 高亮逐字相容：'+native+'/'+tokens.length+'；其餘保留原高亮，全部使用 Rust 程式區塊外框');
+    const candidate=blocks[i],original=md.renderer.rules.fence([token],0);
+    if(candidate===original){stats.native++;continue;}
+    let at=0;
+    while(at<Math.min(candidate.length,original.length)&&candidate[at]===original[at])at++;
+    const location=locations[i].slug+':'+(token.map[0]+1);
+    mismatches.push(location+' '+token.info);
+    console.error('Rust 高亮差異 '+location+' '+token.info+' '+JSON.stringify({candidate:candidate.slice(Math.max(0,at-60),at+180),reference:original.slice(Math.max(0,at-60),at+180)}));
+  }
+  const native=tokens.length-mismatches.length;
+  console.log('Rust 高亮逐字相容：'+native+'/'+tokens.length);
   console.log('Rust 高亮各語言：'+[...byLanguage].map(([lang,{native,total}])=>lang+' '+native+'/'+total).join('；'));
-  return {blocks,native,total:tokens.length};
+  if(mismatches.length)throw new Error('Rust 高亮必須零回退：'+mismatches.join(', '));
+  return {blocks,renderer:'rust',native,total:tokens.length,fallback:0,byLanguage:Object.fromEntries(byLanguage)};
 }
 
 export function applyNativeFences(lessons) {

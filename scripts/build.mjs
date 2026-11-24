@@ -63,7 +63,7 @@ const generated = [
   ['assets/search-index.json', searchIndex],
   ['third-party-licenses.txt', (await Promise.all(['markdown-it','highlight.js'].map(async name =>
     name + '\n' + await readFile(join(projectRoot,'node_modules',name,'LICENSE'), 'utf8')))).join('\n\n')],
-  ['build-render-report.json', JSON.stringify({layout: 'rust', pages: pages.length, markdown: renderReport}, null, 2)],
+  ['build-render-report.json', JSON.stringify({layout: 'rust', pages: pages.length, markdown: renderReport.markdown, highlight: renderReport.highlight}, null, 2)],
 ];
 const fields = ['site-write-v1', String(generated.length), ...generated.flat()];
 if (fields.some(field => typeof field !== 'string' || field.includes('\0'))) {

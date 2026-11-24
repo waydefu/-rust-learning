@@ -205,7 +205,10 @@ fn highlight(lang:&str,source:&str)->String{
                 if let Some(end)=declaration(&mut out,s,word,len){i+=end;continue}
                 let n=if s[len..].starts_with('!'){len+1}else{len};
                 let w=&s[..n];let tail=&s[n..];
-                let scope=if n==len&&tail.trim_start().starts_with('(')&&!matches!(word,"let"|"for"|"while"|"if"|"else"|"match"){
+                let scope=if n==len&&tail.starts_with("::"){
+                    // A path segment has the reference grammar's reduced keyword set.
+                    classify(lang,w).filter(|class|matches!(*class,"type"|"built_in")||w=="Self")
+                }else if n==len&&tail.trim_start().starts_with('(')&&!matches!(word,"let"|"for"|"while"|"if"|"else"|"match"){
                     Some("title function_ invoke__")
                 }else{classify(lang,w)};
                 if let Some(class)=scope{span(&mut out,class,w)}else{out.push_str(&escaped(w))}
@@ -230,10 +233,9 @@ fn block(info:&str,highlighted:&str,icon:&str)->String{
 pub(super) fn process_highlight<'a>(n:usize,f:&mut impl Iterator<Item=&'a str>,out:&mut Vec<u8>)->Result<()>{
     let icon=field(f)?;
     for _ in 0..n{
-        let info=field(f)?;let code=field(f)?;let reference=field(f)?;
+        let info=field(f)?;let code=field(f)?;
         let language=info.split_whitespace().next().unwrap_or("");
         emit(out,&block(info,&highlight(language,code),icon))?;
-        emit(out,&block(info,reference,icon))?;
     }
     Ok(())
 }
@@ -244,6 +246,13 @@ pub(super) fn process_highlight<'a>(n:usize,f:&mut impl Iterator<Item=&'a str>,o
         assert!(h.contains("hljs-keyword"));assert!(h.contains("hljs-number"));
         assert!(h.contains("&lt;&amp;"));assert!(!h.contains("<&"));
         assert_eq!(highlight("text","<b>"),"&lt;b&gt;");
+    }
+    #[test]fn highlights_path_and_config_regressions(){
+        assert_eq!(highlight("rust","use super::*;"),"<span class=\"hljs-keyword\">use</span> super::*;");
+        assert_eq!(highlight("rust","String::new()"),"<span class=\"hljs-type\">String</span>::<span class=\"hljs-title function_ invoke__\">new</span>()");
+        assert_eq!(highlight("bash","cd ~/rust-learning/day01\n"),"<span class=\"hljs-built_in\">cd</span> ~/rust-learning/day01\n");
+        assert_eq!(highlight("bash","rustc --edition=2024 main.rs\n"),"rustc --edition=2024 main.rs\n");
+        assert_eq!(highlight("toml","[package]\nedition = \"2024\"\n"),"<span class=\"hljs-section\">[package]</span>\n<span class=\"hljs-attr\">edition</span> = <span class=\"hljs-string\">&quot;2024&quot;</span>\n");
     }
     #[test]fn wrapper_preserves_contract(){
         let h=block("rust error E0382","&lt;","ICON");
