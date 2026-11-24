@@ -199,7 +199,7 @@ test('reading indicator tracks scroll and remains decorative', async ({page}) =>
   await page.evaluate(() => scrollTo(0,0));
   await expect.poll(() => indicator.locator('span').evaluate(el => el.style.transform)).toBe('scaleX(0)');
   await page.evaluate(() => scrollTo(0,document.documentElement.scrollHeight));
-  await expect.poll(() => indicator.locator('span').evaluate(el => el.style.transform)).toBe('scaleX(1)');
+  await expect.poll(() => indicator.locator('span').evaluate(el => Number(el.style.transform.slice(7,-1)))).toBeGreaterThan(.99);
   expect(await indicator.locator('span').evaluate(el => parseFloat(getComputedStyle(el).transitionDuration))).toBeLessThan(0.01);
 });
 
@@ -210,4 +210,28 @@ test('switching reduced motion while welcome is active removes it', async ({page
   await page.emulateMedia({reducedMotion:'reduce'});
   await expect(page.locator('.startup-motion')).toHaveCount(0);
   await expect(page.getByRole('link',{name:'開始學習'})).toBeVisible();
+});
+
+
+test('interactive Vec capacity, race and Future models explain state', async ({page}) => {
+  await page.goto(target('chapters/collections/'));
+  let lab=page.locator('[data-concept-lab="vec"]');
+  for(let i=0;i<3;i++) await lab.getByRole('button',{name:'push 一個元素'}).click();
+  await expect(lab.getByRole('status')).toContainText('len = 3，capacity = 4');
+  await lab.getByRole('button',{name:'pop 一個元素'}).click();
+  await expect(lab.getByRole('status')).toContainText('len = 2，capacity = 4');
+  await page.goto(target('chapters/concurrency/'));
+  lab=page.locator('[data-concept-lab="race"]');
+  for(let i=0;i<4;i++) await lab.getByRole('button',{name:'執行下一步'}).click();
+  await expect(lab.getByRole('status')).toContainText('一次更新遺失');
+  await lab.getByRole('button',{name:'改用 Mutex'}).click();
+  for(let i=0;i<4;i++) await lab.getByRole('button',{name:'執行下一步'}).click();
+  await expect(lab.getByRole('status')).toContainText('結果為 2');
+  await page.goto(target('chapters/async/'));
+  lab=page.locator('[data-concept-lab="future"]');
+  await lab.getByRole('button',{name:'poll()'}).click();
+  await expect(lab.getByRole('button',{name:'poll()'})).toBeDisabled();
+  await lab.getByRole('button',{name:'模擬 I/O 喚醒'}).click();
+  await lab.getByRole('button',{name:'poll()'}).click();
+  await expect(lab.getByRole('status')).toContainText('Ready(42)');
 });

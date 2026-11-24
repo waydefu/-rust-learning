@@ -370,3 +370,109 @@ if (page.chapter) {
   if ('ResizeObserver' in window) new ResizeObserver(schedule).observe(document.body);
   update();
 }
+
+
+// Small, deterministic conceptual models, not an in-browser Rust compiler.
+// The chapter prose remains usable when JavaScript is unavailable.
+(() => {
+  const prose = document.querySelector('.prose');
+  const models = {
+    '08': {title:'Vec：容量用完之後會怎樣？', intro:'這個模型假設容量按 2、4、8 成長，方便觀察重新配置；Rust 不保證實際採用這種成長策略。', mount:0, id:'vec'},
+    '16': {title:'兩個執行緒，為什麼會遺失一次加法？', intro:'模擬兩次「讀取、加一、寫回」交錯；這是抽象的邏輯競態模型，不是在 Rust 中使用未同步的可變記憶體。', mount:4, id:'race'},
+    '17': {title:'Future 的三個時刻：輪詢、喚醒、完成', intro:'模擬一個必須等待 I/O 的 Future。喚醒只是要求重新排程，不保證每種 Future 下次輪詢一定完成。', mount:2, id:'future'},
+  };
+  const model = models[page.chapter];
+  if (!prose || !model) return;
+  const element = (tag, text, className) => {
+    const el = document.createElement(tag);
+    if (text) el.textContent = text;
+    if (className) el.className = className;
+    return el;
+  };
+  const panel = element('section', '', 'concept-lab');
+  panel.dataset.conceptLab = model.id;
+  const heading = element('h3', model.title);
+  heading.id = 'concept-lab-' + model.id;
+  panel.setAttribute('aria-labelledby',heading.id);
+  const explanation = element('p',model.intro);
+  const view = element('div','','concept-view');
+  view.setAttribute('aria-hidden','true');
+  const controls = element('div','','concept-controls');
+  const status = element('p','','concept-status');
+  status.setAttribute('role','status');
+  status.setAttribute('aria-atomic','true');
+  const button = (label, action) => {
+    const b = element('button',label,'concept-button');
+    b.type = 'button';
+    b.addEventListener('click',action);
+    controls.append(b);
+    return b;
+  };
+  const cells = (values, occupied) => {
+    view.replaceChildren(...values.map((value,i) => {
+      const cell = element('span',String(value),'concept-cell');
+      if (occupied(i)) cell.dataset.filled = 'true';
+      return cell;
+    }));
+    motionFeedback(view,[{transform:'translateY(2px)'},{transform:'none'}],180);
+  };
+  panel.append(heading,explanation,view,controls,status);
+  const sections = [...prose.querySelectorAll(':scope > h2')];
+  const next = sections[model.mount + 1];
+  if (next) next.before(panel); else prose.append(panel);
+  if (model.id === 'vec') {
+    let length=0, capacity=2;
+    const render = message => {
+      cells(Array.from({length:capacity},(_,i)=>i<length?i+1:'—'),i=>i<length);
+      push.disabled = length===8;
+      status.textContent = 'len = '+length+'，capacity = '+capacity+'。'+message;
+    };
+    const push = button('push 一個元素', () => {
+      const grow = length===capacity;
+      if (grow) capacity*=2;
+      length++;
+      render(grow?'原容量不足，模型配置了更大的緩衝區並搬移舊元素。':'仍有空位，不必擴容。');
+    });
+    button('pop 一個元素',()=>{if(length) length--;render('移除末端元素；pop 不會自動縮小容量。');});
+    button('重設',()=>{length=0;capacity=2;render('初始緩衝區。');});
+    render('初始緩衝區。');
+  } else if (model.id === 'race') {
+    let step=0, locked=false, total=0, a=null, b=null;
+    const render=message=>{
+      cells(['共享值 '+total,'A '+(a??'—'),'B '+(b??'—')],()=>true);
+      advance.disabled=step===4;
+      status.textContent=message;
+    };
+    const reset=()=>{step=0;total=0;a=null;b=null;render(locked?'Mutex 版本：每次完整更新都持有鎖。':'無互斥版本：兩個讀取可能交錯。');};
+    const advance=button('執行下一步',()=>{
+      let message='';
+      if(locked){
+        if(step===0){a=total;message='A 取得鎖並讀取 '+a;}
+        if(step===1){total=a+1;message='A 寫回 '+total+' 並釋放鎖。';}
+        if(step===2){b=total;message='B 取得鎖並讀取 '+b;}
+        if(step===3){total=b+1;message='B 寫回 '+total+'，結果為 2。';}
+      }else{
+        if(step===0){a=total;message='A 讀取 '+a;}
+        if(step===1){b=total;message='B 也讀取 '+b;}
+        if(step===2){total=a+1;message='A 寫回 '+total;}
+        if(step===3){total=b+1;message='B 根據舊值寫回 '+total+'，一次更新遺失。';}
+      }
+      step++;render(message);
+    });
+    const toggle=button('改用 Mutex',()=>{locked=!locked;toggle.textContent=locked?'改用無互斥模型':'改用 Mutex';reset();});
+    button('重設',reset);reset();
+  } else {
+    let phase=0;
+    const messages=['已建立 Future，函式尚未開始。','poll 回傳 Pending，等待 I/O 並登記 Waker。','I/O 準備好，Waker 通知 executor 重新排程。','下一次 poll 回傳 Ready(42)，此模型的工作完成。'];
+    const render=()=>{
+      cells(['建立','Pending','喚醒','Ready'],i=>i===phase);
+      poll.disabled=phase===1||phase===3;
+      wake.disabled=phase!==1;
+      status.textContent=messages[phase];
+    };
+    const poll=button('poll()',()=>{phase=phase===0?1:3;render();});
+    const wake=button('模擬 I/O 喚醒',()=>{phase=2;render();});
+    button('重設',()=>{phase=0;render();});
+    render();
+  }
+})();

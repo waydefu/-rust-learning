@@ -467,3 +467,17 @@ dialog::backdrop { background: #0c1223a8; }
   }
 }
 @keyframes rust-toc-in { from { transform: translateX(-3px); } to { transform: none; } }
+
+
+/* Compact interactive teaching models. All state is also spelled out in text. */
+.prose .concept-lab { border: 1px solid var(--line); background: var(--paper); border-radius: 14px; padding: 16px; margin: 20px 0 26px; }
+.prose .concept-lab h3 { margin: 0 0 8px; }
+.concept-view { display: flex; gap: 6px; flex-wrap: wrap; margin: 14px 0; }
+.concept-cell { display: grid; place-items: center; min-width: 34px; min-height: 38px; padding: 5px 8px; border: 1px dashed var(--line-strong); border-radius: 7px; color: var(--muted); font: 600 .84rem var(--mono); }
+.concept-cell[data-filled="true"] { border-style: solid; border-color: var(--accent); background: var(--tint); color: var(--ink); }
+.concept-controls { display: flex; flex-wrap: wrap; gap: 8px; }
+.concept-button { cursor: pointer; min-height: 44px; padding: 7px 12px; border: 1px solid var(--line-strong); border-radius: 8px; font: inherit; color: var(--ink); background: var(--paper); }
+.concept-button:hover:not(:disabled) { border-color: var(--accent); background: var(--tint); }
+.concept-button:disabled { cursor: default; opacity: .65; }
+.prose .concept-status { margin: 12px 0 0; min-height: 3em; color: var(--ink); font-size: .9rem; }
+@media (max-width: 600px) { .prose .concept-lab { padding: 12px; } .concept-button { flex: 1 1 auto; } }

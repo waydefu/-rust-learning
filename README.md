@@ -60,3 +60,11 @@ npm run test:browser
 ## 目標儲存庫
 
 GitHub 目前可查到名稱含前導連字號的 [waydefu/-rust-learning](https://github.com/waydefu/-rust-learning)。公開推送、輸出版權與 GitHub Pages 設定由維護者確認。上線狀態以 Actions 部署結果與實際 HTTP 驗證為準。
+
+
+## 品質與互動驗收
+
+- 跨瀏覽器抽測：先用 Pages 子路徑建置，再執行 `npx playwright install chromium firefox webkit` 和 `npx playwright test --config=playwright.cross.config.mjs`。Android 為瀏覽器模擬，不是實機。
+- Rust 格式、Clippy 與 RustSec 依賴檢查先建立非阻擋基線報告；修完既有警告與漏洞後才改成強制關卡。現有正式建置、回歸、瀏覽器與部署檢查維持阻擋。
+- 集合、並行與非同步增加可操作的概念模型；它們不是實際編譯器、記憶體配置器或執行緒排程器。停用 JS 時仍可閱讀教材。
+- 具確定性輸出的 `rust run` 可逐行附上 `// 預期輸出: 文字`，原生驗證器會比對完整執行輸出。未標註的範例仍只驗證結束狀態。

@@ -102,10 +102,73 @@ jobs:
           test ! -d node_modules
           jq -e '.highlight.native == .highlight.total and .highlight.fallback == 0 and all(.markdown[]; .renderer == "rust")' dist/build-render-report.json
 
+  cross_browser:
+    name: 跨瀏覽器與 Android 模擬
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: cargo run --locked --manifest-path tools/site-render/Cargo.toml -- build
+        env:
+          BASE_PATH: /-rust-learning/
+      - run: npx playwright install --with-deps chromium firefox webkit
+      - run: npx playwright test --config=playwright.cross.config.mjs
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: cross-browser-traces
+          path: test-results/
+          if-no-files-found: ignore
+
+  rust_quality:
+    name: Rust 品質與依賴稽核（基線報告）
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - run: rustup component add rustfmt clippy
+      - name: 格式檢查（現有格式債先報告）
+        continue-on-error: true
+        shell: bash
+        run: |
+          status=0
+          for crate in lesson-check site-tools site-render; do
+            cargo fmt --manifest-path "tools/$crate/Cargo.toml" -- --check || status=1
+          done
+          exit "$status"
+      - name: Clippy（現有警告先報告）
+        continue-on-error: true
+        shell: bash
+        run: |
+          status=0
+          for crate in lesson-check site-tools site-render; do
+            cargo clippy --locked --manifest-path "tools/$crate/Cargo.toml" --all-targets -- -D warnings || status=1
+          done
+          exit "$status"
+      - name: RustSec 依賴掃描（基線報告）
+        continue-on-error: true
+        shell: bash
+        run: |
+          cargo +stable install --locked cargo-audit
+          status=0
+          for lock in tools/lesson-check/Cargo.lock tools/site-tools/Cargo.lock tools/site-render/Cargo.lock examples/Cargo.lock; do
+            cargo audit --file "$lock" || status=1
+          done
+          exit "$status"
+
   build_pages:
     name: 建置與上傳 Pages 產物
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    needs: [verify, native_only]
+    needs: [verify, native_only, cross_browser]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
