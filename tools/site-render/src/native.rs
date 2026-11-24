@@ -890,28 +890,29 @@ fn build(course: &Course, base: &str) -> Result<()> {
     Ok(())
 }
 fn check_examples(course: &Course) -> Result<()> {
-    let mut fields = Vec::new();
-    for l in &course.lessons {
-        add(&mut fields, &[&l.entry.slug]);
-        number(&mut fields, l.examples.len());
-        for e in &l.examples {
-            number(&mut fields, e.line);
-            add(&mut fields, &[&e.info, &e.code]);
-        }
-    }
-    let output = packet("examples-v1", course.lessons.len(), fields)?;
-    if output.len() < 6 {
-        return Err("範例執行器結果不完整".into());
-    }
-    let n = |i: usize| output[i].parse::<usize>().map_err(fail);
-    let (compiled, run, error, project, messages) = (n(1)?, n(2)?, n(3)?, n(4)?, n(5)?);
-    if output.len() != 6 + messages {
-        return Err("範例訊息不完整".into());
-    }
-    println!("{}", output[0]);
-    for message in &output[6..] {
+    let lessons: Vec<_> = course
+        .lessons
+        .iter()
+        .map(|lesson| super::examples::Lesson {
+            slug: &lesson.entry.slug,
+            examples: lesson
+                .examples
+                .iter()
+                .map(|example| super::examples::Example {
+                    line: example.line,
+                    info: &example.info,
+                    source: &example.code,
+                })
+                .collect(),
+        })
+        .collect();
+    let report = super::examples::check(&lessons)?;
+    println!("{}", report.version);
+    for message in &report.messages {
         println!("{message}");
     }
+    let (compiled, run, error, project) =
+        (report.compiled, report.run, report.error, report.project);
     println!(
         "Rust 區塊通過 {} 段（獨立編譯 {compiled} 段，其中 {run} 段執行或執行測試，預期診斷 {error} 段，Cargo 專案 {project} 段）",
         compiled + error + project

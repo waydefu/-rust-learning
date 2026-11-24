@@ -418,6 +418,26 @@ impl Runner {
         Ok(())
     }
 }
+pub(super) struct Example<'a> {
+    pub line: usize,
+    pub info: &'a str,
+    pub source: &'a str,
+}
+
+pub(super) struct Lesson<'a> {
+    pub slug: &'a str,
+    pub examples: Vec<Example<'a>>,
+}
+
+pub(super) struct Report {
+    pub version: String,
+    pub compiled: usize,
+    pub run: usize,
+    pub error: usize,
+    pub project: usize,
+    pub messages: Vec<String>,
+}
+
 pub(super) fn process_examples<'a>(
     n: usize,
     f: &mut impl Iterator<Item = &'a str>,
@@ -429,13 +449,33 @@ pub(super) fn process_examples<'a>(
         let slug = field(f)?;
         let mut tokens = Vec::new();
         for _ in 0..count(f, 5000)? {
-            tokens.push((count(f, 1_000_000)?, field(f)?, field(f)?));
+            tokens.push(Example {
+                line: count(f, 1_000_000)?,
+                info: field(f)?,
+                source: field(f)?,
+            });
         }
-        lessons.push((slug, tokens));
+        lessons.push(Lesson {
+            slug,
+            examples: tokens,
+        });
     }
     if f.next().is_some() {
         return Err("範例資料包含多餘欄位".into());
     }
+    let report = check(&lessons)?;
+    emit(out, &report.version)?;
+    for value in [report.compiled, report.run, report.error, report.project] {
+        emit(out, &value.to_string())?;
+    }
+    emit(out, &report.messages.len().to_string())?;
+    for message in report.messages {
+        emit(out, &message)?;
+    }
+    Ok(())
+}
+
+pub(super) fn check(lessons: &[Lesson<'_>]) -> Result<Report> {
     let root = Scratch::new()?;
     let project_root = env::current_dir().map_err(err)?;
     fs::copy(
@@ -465,9 +505,11 @@ pub(super) fn process_examples<'a>(
     let version_text = version.stdout.trim().to_owned();
     success(version)?;
     let mut failures = Vec::new();
-    for (slug, tokens) in lessons {
+    for lesson in lessons {
+        let slug = lesson.slug;
         let mut previous = None;
-        for (line, info, source) in tokens {
+        for example in &lesson.examples {
+            let Example { line, info, source } = *example;
             let mut parts = info.split_whitespace();
             if parts.next() != Some("rust") {
                 previous = None;
@@ -494,20 +536,14 @@ pub(super) fn process_examples<'a>(
     if !failures.is_empty() {
         return Err(failures.join("\n\n"));
     }
-    emit(out, &version_text)?;
-    for value in [
-        runner.stats.compiled,
-        runner.stats.run,
-        runner.stats.error,
-        runner.stats.project,
-    ] {
-        emit(out, &value.to_string())?
-    }
-    emit(out, &messages.len().to_string())?;
-    for message in messages {
-        emit(out, &message)?;
-    }
-    Ok(())
+    Ok(Report {
+        version: version_text,
+        compiled: runner.stats.compiled,
+        run: runner.stats.run,
+        error: runner.stats.error,
+        project: runner.stats.project,
+        messages,
+    })
 }
 #[cfg(test)]
 mod tests {

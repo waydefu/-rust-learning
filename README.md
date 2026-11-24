@@ -80,3 +80,5 @@ Rust 工具統一使用 `tools/Cargo.toml` workspace、`tools/Cargo.lock` 與 `t
 ### 獨立回歸與固定歷史參考
 
 `npm run test:regression` 驗證目前工作樹的 Rust 建置可重現、無效部署路徑拒絕並保留整棵產物、以及網站檢查器的八個負例。`scripts/regression/verify-reference.sh` 僅在 CI 或手動驗收時使用 Git 固定提交 `b2c5abe32610f6f098e46ec2501c9514fed2066d` 的舊 Node 參考程式，搭配目前 HEAD 的 Rust 工具、教材及資產；保留原有逐位元組與 rust-anything 重播證據。不要在現行原始碼重新加入另一套渲染器。若預期改變 HTML 契約，須以獨立回歸基準明確審核差異，而非靜默放寬比較。
+
+正式網站渲染以具名型別傳遞導覽、首頁、教材分類、流程、測驗、所有權步驟及頁面資料，HTML 外框直接呼叫模板函式；教材執行器直接回傳具名統計。歷史欄位介面仍由相容 adapter 解析，以固定版本回歸驗證。網站檢查器尚保留欄位介面。
