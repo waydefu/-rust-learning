@@ -16,9 +16,7 @@ cargo run --locked --manifest-path tools/site-render/Cargo.toml -- dev
 cargo run --locked --manifest-path tools/site-render/Cargo.toml -- build
 cargo run --locked --manifest-path tools/site-render/Cargo.toml -- check
 cargo run --locked --manifest-path tools/site-render/Cargo.toml -- check-rust
-cargo test --locked --manifest-path tools/lesson-check/Cargo.toml
-cargo test --locked --manifest-path tools/site-tools/Cargo.toml
-cargo test --locked --manifest-path tools/site-render/Cargo.toml
+cargo test --locked --workspace --manifest-path tools/Cargo.toml
 BASE_PATH=/-rust-learning/ cargo run --locked --manifest-path tools/site-render/Cargo.toml -- build
 BASE_PATH=/-rust-learning/ cargo run --locked --manifest-path tools/site-render/Cargo.toml -- check
 # 僅做舊版與瀏覽器測試時需要 Node：
@@ -72,3 +70,5 @@ GitHub 目前可查到名稱含前導連字號的 [waydefu/-rust-learning](https
 ### 前端模組
 
 瀏覽器入口 `src/assets/app.js` 僅負責初始化；`modules/` 分別管理共用資料、導覽搜尋、學習進度、閱讀互動、動效及概念實驗室。`site.css` 保留基礎設計及教材排版，`motion.css` 和 `concept-labs.css` 管理對應功能。所有入口與 modulepreload 由 HTML 宣告，維持原有靜態資源驗證與大小預算。
+
+Rust 工具統一使用 `tools/Cargo.toml` workspace、`tools/Cargo.lock` 與 `tools/target/`；教材的外部依賴範例維持獨立 Cargo 專案，避免教學依賴影響網站工具。

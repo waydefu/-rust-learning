@@ -27,9 +27,7 @@ jobs:
       - run: npm ci
       - run: npm audit --audit-level=high
       - run: rustup show
-      - run: cargo test --locked --manifest-path tools/lesson-check/Cargo.toml
-      - run: cargo test --locked --manifest-path tools/site-tools/Cargo.toml
-      - run: cargo test --locked --manifest-path tools/site-render/Cargo.toml
+      - run: cargo test --locked --workspace --manifest-path tools/Cargo.toml
       - name: Rust-anything 行為錄製與重播
         shell: bash
         run: bash scripts/migration/replay-site-write.sh
@@ -62,7 +60,7 @@ jobs:
         shell: bash
         run: |
           cargo build --locked --manifest-path tools/site-render/Cargo.toml
-          setsid tools/site-render/target/debug/site-render dev &
+          setsid tools/target/debug/site-render dev &
           server=$!
           trap 'kill -- -"$server" 2>/dev/null || true; wait "$server" 2>/dev/null || true' EXIT
           url="http://127.0.0.1:4173/-rust-learning"
@@ -139,25 +137,17 @@ jobs:
       - name: 格式檢查
         shell: bash
         run: |
-          status=0
-          for crate in lesson-check site-tools site-render; do
-            cargo fmt --manifest-path "tools/$crate/Cargo.toml" -- --check || status=1
-          done
-          exit "$status"
+          cargo fmt --all --manifest-path tools/Cargo.toml -- --check
       - name: Clippy
         shell: bash
         run: |
-          status=0
-          for crate in lesson-check site-tools site-render; do
-            cargo clippy --locked --manifest-path "tools/$crate/Cargo.toml" --all-targets -- -D warnings || status=1
-          done
-          exit "$status"
+          cargo clippy --locked --workspace --manifest-path tools/Cargo.toml --all-targets -- -D warnings
       - name: RustSec 依賴掃描
         shell: bash
         run: |
           cargo +stable install --locked --version 0.23.0 cargo-audit
           status=0
-          for lock in tools/lesson-check/Cargo.lock tools/site-tools/Cargo.lock tools/site-render/Cargo.lock examples/Cargo.lock; do
+          for lock in tools/Cargo.lock examples/Cargo.lock; do
             cargo audit --file "$lock" || status=1
           done
           exit "$status"

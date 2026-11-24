@@ -4,11 +4,9 @@ playwright-report/
 test-results/
 .DS_Store
 
-tools/lesson-check/target/
-
-tools/site-tools/target/
-
-tools/site-render/target/
+tools/target/
+# Ignore pre-workspace build directories in existing clones.
+tools/*/target/
 
 .migration-evidence/
 .site-write-*/

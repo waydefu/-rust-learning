@@ -37,7 +37,7 @@ tool="$scratch/tool/$asset/rust-anything"
 "$tool" --version
 cargo build --locked --manifest-path tools/site-tools/Cargo.toml --bin site-write
 cp scripts/migration/legacy-site-write.mjs "$scratch/recording/original.mjs"
-cp tools/site-tools/target/debug/site-write "$scratch/recording/site-write"
+cp tools/target/debug/site-write "$scratch/recording/site-write"
 node scripts/migration/write-cases.mjs > "$scratch/inputs.jsonl"
 # The command runs inside a fresh sandbox per case. The input corpus includes
 # invalid packets; there is no arbitrary shell command or production checkout.
