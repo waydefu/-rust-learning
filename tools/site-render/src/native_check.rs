@@ -43,47 +43,21 @@ fn decode_fragment(s: &str) -> Result<String> {
     }
     String::from_utf8(bytes).map_err(fail)
 }
-fn typed_index(v: &Value) -> Result<Vec<super::super::site_check::IndexEntry<'_>>> {
+fn typed_index(v: &[schema::SearchEntry]) -> Vec<super::super::site_check::IndexEntry<'_>> {
     use super::super::site_check::IndexEntry;
-    v.as_array()
-        .ok_or("搜尋索引非清單")?
-        .iter()
-        .map(|e| {
-            Ok(IndexEntry {
-                title: s(e, "title")?,
-                id: s(e, "id")?,
-                description: s(e, "description")?,
-                href: s(e, "href")?,
-                text: s(e, "text")?,
-                headings: list(e, "headings")?
-                    .iter()
-                    .map(|h| Ok((s(h, "id")?, s(h, "label")?)))
-                    .collect::<Result<Vec<_>>>()?,
-            })
-        })
-        .collect()
-}
-fn index_shape(v: &Value) -> bool {
-    v.as_array().is_some_and(|a| {
-        a.iter().all(|e| {
-            e.as_object().is_some_and(|o| o.len() == 6)
-                && ["title", "id", "description", "href", "text"]
-                    .iter()
-                    .all(|k| s(e, k).is_ok())
-                && list(e, "headings").is_ok_and(|h| {
-                    h.iter().all(|h| {
-                        h.as_object().is_some_and(|o| o.len() == 2)
-                            && s(h, "id").is_ok()
-                            && s(h, "label").is_ok()
-                    })
-                })
-        })
-    })
+    v.iter().map(|e| IndexEntry {
+        title: &e.title,
+        id: &e.id,
+        description: &e.description,
+        href: &e.href,
+        text: &e.text,
+        headings: e.headings.iter().map(|h| (h.id.as_str(), h.label.as_str())).collect(),
+    }).collect()
 }
 pub(super) fn check(course: &Course, base: &str) -> Result<()> {
     let root = Path::new("dist");
     use super::super::site_check;
-    let stages = course.stages()?;
+    let stages = course.stages();
     let lessons = course
         .lessons
         .iter()
@@ -97,7 +71,7 @@ pub(super) fn check(course: &Course, base: &str) -> Result<()> {
                 resource: e.resource(),
                 stage_count: stages
                     .iter()
-                    .filter(|st| s(st, "id").ok() == Some(e.group.as_str()))
+                    .filter(|st| st.id == e.group)
                     .count(),
                 source_id: &e.source_id,
                 source_valid: e.source_valid,
@@ -199,35 +173,27 @@ pub(super) fn check(course: &Course, base: &str) -> Result<()> {
             links,
         });
     }
-    let report = load(root.join("build-render-report.json"))?;
-    let high = report.get("highlight").ok_or("缺少高亮報告")?;
+    let report: schema::RenderReport = load(root.join("build-render-report.json"))?;
+    let high = &report.highlight;
     let render_report = site_check::RenderReport {
-        layout: s(&report, "layout")?,
-        pages: num(&report, "pages")?,
-        markdown: list(&report, "markdown")?
-            .iter()
-            .map(|item| Ok((s(item, "slug")?, s(item, "renderer")?)))
-            .collect::<Result<Vec<_>>>()?,
-        renderer: s(high, "renderer")?,
-        native: num(high, "native")?,
-        total: num(high, "total")?,
-        fallback: num(high, "fallback")?,
+        layout: &report.layout,
+        pages: report.pages,
+        markdown: report.markdown.iter().map(|item| (item.slug.as_str(), item.renderer.as_str())).collect(),
+        renderer: &high.renderer,
+        native: high.native,
+        total: high.total,
+        fallback: high.fallback,
     };
-    let index = load(root.join("assets/search-index.json"))?;
-    let shape = index_shape(&index);
+    let index = load::<Vec<schema::SearchEntry>>(root.join("assets/search-index.json"));
     let expected_index = course.index(base);
     let summary = site_check::verify(&site_check::Input {
         base,
         lessons,
         pages,
         report: render_report,
-        shape_valid: shape,
-        expected_index: typed_index(&expected_index)?,
-        index: if shape {
-            typed_index(&index)?
-        } else {
-            Vec::new()
-        },
+        shape_valid: index.is_ok(),
+        expected_index: typed_index(&expected_index),
+        index: index.as_ref().map(|v| typed_index(v)).unwrap_or_default(),
     })?;
     println!(
         "{} 份 Markdown、{} 個 HTML、{} 個站內引用與搜尋索引通過，首頁與共用資源 {:.1} kB（未壓縮），BASE_PATH={base}",

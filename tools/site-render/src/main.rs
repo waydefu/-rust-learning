@@ -15,6 +15,7 @@ mod native;
 mod navigation;
 mod page_data;
 mod reader;
+mod schema;
 mod site_check;
 
 use compat::{count, emit, field};
