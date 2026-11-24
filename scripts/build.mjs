@@ -1,6 +1,6 @@
-import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { catalog, chapters, md, projectRoot, readLesson } from '../src/course.mjs';
 import { makeSite } from '../src/site.mjs';
 import { renderNativeBodies, renderNativeLayouts } from '../src/native-render.mjs';
@@ -10,7 +10,6 @@ if (!/^\/(?:[\w.-]+\/)*[\w.-]*\/?$/.test(inputBase) || inputBase.startsWith('//'
   throw new Error('BASE_PATH 必須是 / 或以 / 開頭的安全部署子路徑');
 }
 const base = inputBase.endsWith('/') ? inputBase : inputBase + '/';
-const dist = join(projectRoot, 'dist');
 const site = makeSite(base);
 // Native Rust preflight: reject malformed teaching notes before changing dist/.
 execFileSync(process.env.CARGO || 'cargo', [
@@ -50,22 +49,25 @@ for (let i = 0; i < pages.length; i++) {
   if (pages[i] !== baseline[i]) throw new Error('Rust 頁面模板與原版不一致：' + pagePaths[i]);
 }
 
-async function write(path, contents) {
-  const target = join(dist, path);
-  await mkdir(dirname(target), { recursive: true });
-  await writeFile(target, contents);
+// Rust owns the filesystem output. The complete packet is validated before
+// replacing dist, and the existing output survives failed staging.
+const generated = [
+  ...pagePaths.map((path,i) => [path, pages[i]]),
+  ['.nojekyll', ''],
+  ['assets/search-index.json', searchIndex],
+  ['third-party-licenses.txt', (await Promise.all(['markdown-it','highlight.js'].map(async name =>
+    name + '\n' + await readFile(join(projectRoot,'node_modules',name,'LICENSE'), 'utf8')))).join('\n\n')],
+  ['build-render-report.json', JSON.stringify({layout: 'rust', pages: pages.length, markdown: renderReport}, null, 2)],
+];
+const fields = ['site-write-v1', String(generated.length), ...generated.flat()];
+if (fields.some(field => typeof field !== 'string' || field.includes('\0'))) {
+  throw new Error('網站產物含有不支援的 NUL 字元或非文字欄位');
 }
-
-await rm(dist, { recursive: true, force: true });
-await mkdir(dist, { recursive: true });
-await cp(join(projectRoot, 'src/assets'), join(dist, 'assets'), { recursive: true });
-await Promise.all([
-  ...pagePaths.map((path,i) => write(path, pages[i])),
-  write('.nojekyll', ''),
-  write('assets/search-index.json', searchIndex),
-  write('third-party-licenses.txt', (await Promise.all(['markdown-it','highlight.js'].map(async name =>
-    `${name}\n${await readFile(join(projectRoot,'node_modules',name,'LICENSE'), 'utf8')}`))).join('\n\n')),
-]);
-
-await write('build-render-report.json', JSON.stringify({layout: 'rust', pages: pages.length, markdown: renderReport}, null, 2));
-console.log(`Built ${pages.length} HTML pages at ${base} (Rust layout and search index)`);
+execFileSync(process.env.CARGO || 'cargo', [
+  'run', '--quiet', '--locked', '--manifest-path', 'tools/site-tools/Cargo.toml', '--bin', 'site-write',
+], {cwd: projectRoot, input: fields.join('\0') + '\0', stdio: ['pipe','inherit','inherit']});
+if (process.env.VERIFY_SITE_WRITE === '1') {
+  const {verifySiteWrite} = await import('./migration/verify-site-write.mjs');
+  await verifySiteWrite(projectRoot, generated);
+}
+console.log('Built ' + pages.length + ' HTML pages at ' + base + ' (Rust layout, search index and writer)');

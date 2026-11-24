@@ -23,7 +23,7 @@ assert_eq!(it.next(), Some(&1));
 assert_eq!(it.next(), Some(&2));
 ```
 
-Iterator trait 定義 Item 關聯型別及 next() -> Option<Self::Item>。Some 表示有下一項，None 表示已結束。每次呼叫 next 才讓進度往前。
+`Iterator` trait 定義 `Item` 關聯型別及 `next() -> Option<Self::Item>`。Some 表示有下一項，None 表示已結束。每次呼叫 next 才讓進度往前。
 
 iter() 借用元素；iter_mut() 可變借用元素；into_iter() 取得對集合的擁有權並依其實作消耗或移動元素。這三者不是單純寫法不同，所有權效果直接不同。
 
