@@ -1,7 +1,7 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
 import { parse } from 'parse5';
-import { catalog, chapters, projectRoot, readLesson, resources, stages } from '../src/course.mjs';
+import { calloutTypes, catalog, chapters, projectRoot, readLesson, resources, stages } from '../src/course.mjs';
 
 const dist = join(projectRoot, 'dist');
 const base = (process.env.BASE_PATH || '/').replace(/\/?$/, '/');
@@ -58,6 +58,22 @@ for (const name of (await readdir(dist, {recursive:true})).filter(name => name.e
 }
 for (const route of [base, base+'resources/', base+'404.html', ...catalog.map(entry=>base+entry.path+'/')]) {
   if (!routes.has(route)) errors.push(`${route} 尚未生成`);
+}
+
+for (const entry of chapters) {
+  const route = base + entry.path + '/';
+  const page = routes.get(route);
+  if (!page) continue;
+  const notes = page.nodes.filter(node => attrs(node)['data-callout']);
+  const kinds = notes.map(node => attrs(node)['data-callout']);
+  if (notes.length < Object.keys(calloutTypes).length || Object.values(calloutTypes).some(kind => !kinds.includes(kind))) {
+    errors.push(`${route} 缺少五種教學方塊`);
+  }
+  for (const note of notes) {
+    if (attrs(note).role !== 'note' || ![...elements(note)].some(node => attrs(node).class === 'callout-title')) {
+      errors.push(`${route} 教學方塊缺少文字標題或語意`);
+    }
+  }
 }
 
 for (const [route, page] of routes) {

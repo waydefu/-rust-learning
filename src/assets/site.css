@@ -360,3 +360,33 @@ dialog::backdrop { background: #0c1223a8; }
 @media (max-width: 600px) {
   .mobile-drawer .nav-chapters a, .lab-controls button { min-height: 44px; }
 }
+
+/* Teaching notes are readable without JS; text labels also identify each kind. */
+.prose .lesson-callout {
+  --note-ink: var(--stage-blue);
+  --note-bg: var(--stage-blue-bg);
+  margin: 20px 0;
+  padding: 14px 17px;
+  border: 1px solid var(--line);
+  border-inline-start: 4px solid var(--note-ink);
+  border-radius: 10px;
+  background: var(--note-bg);
+  color: var(--ink);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.prose .callout-analogy { --note-ink: var(--stage-purple); --note-bg: var(--stage-purple-bg); }
+.prose .callout-walkthrough { --note-ink: var(--stage-green); --note-bg: var(--stage-green-bg); }
+.prose .callout-warning { --note-ink: var(--stage-orange); --note-bg: var(--stage-orange-bg); }
+.prose .callout-practice { --note-ink: #256038; --note-bg: #eef8eb; }
+:root[data-theme="dark"] .prose .callout-practice { --note-ink: #b2e5b7; --note-bg: #253b2c; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .prose .callout-practice { --note-ink: #b2e5b7; --note-bg: #253b2c; }
+}
+.prose .lesson-callout .callout-title { color: var(--note-ink); font-size: .91rem; font-weight: 750; margin: 0 0 6px; line-height: 1.5; }
+.prose .lesson-callout p:last-child { margin-bottom: 0; }
+.prose .lesson-callout :not(pre) > code { background: var(--paper); color: var(--ink); }
+.prose .lesson-callout a { color: var(--ink); }
+@media (max-width: 540px) {
+  .prose .lesson-callout { padding: 12px 13px; margin: 16px 0; }
+}

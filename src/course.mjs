@@ -27,6 +27,36 @@ export const escape = value => String(value).replace(/[&<>"']/g, character => ({
 })[character]);
 
 export const md = new MarkdownIt({ html: false, linkify: false });
+
+// A normal Markdown blockquote with a standalone bold teaching label becomes
+// a note. Ordinary quotes keep their original semantics and appearance.
+export const calloutTypes = Object.freeze({
+  '來龍去脈': 'context',
+  '生活比喻': 'analogy',
+  '程式拆解': 'walkthrough',
+  '常見陷阱': 'warning',
+  '動手驗收': 'practice',
+});
+md.core.ruler.after('inline', 'lesson_callouts', state => {
+  const tokens = state.tokens;
+  for (let i = 0; i < tokens.length; i++) {
+    const open = tokens[i];
+    if (open.type !== 'blockquote_open' || tokens[i + 1]?.type !== 'paragraph_open') continue;
+    const label = tokens[i + 2];
+    if (label?.type !== 'inline' || tokens[i + 3]?.type !== 'paragraph_close') continue;
+    const match = /^\*\*([^*]+)\*\*$/.exec(label.content.trim());
+    const type = match && Object.hasOwn(calloutTypes, match[1]) ? calloutTypes[match[1]] : null;
+    if (!type) continue;
+    const close = tokens.findIndex((token, j) => j > i && token.type === 'blockquote_close' && token.level === open.level);
+    if (close === -1 || close <= i + 4) continue;
+    open.tag = 'div';
+    tokens[close].tag = 'div';
+    open.attrSet('class', 'lesson-callout callout-' + type);
+    open.attrSet('data-callout', type);
+    open.attrSet('role', 'note');
+    tokens[i + 1].attrSet('class', 'callout-title');
+  }
+});
 md.renderer.rules.fence = (tokens, index) => {
   const token = tokens[index];
   const [language, mode] = token.info.trim().split(/\s+/);
