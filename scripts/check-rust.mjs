@@ -108,6 +108,8 @@ function verifyProjects() {
 }
 
 try {
+  // Rustup resolves the toolchain from the compiler and Cargo working directory.
+  copyFileSync(join(projectRoot,'rust-toolchain.toml'), join(root,'rust-toolchain.toml'));
   const version = command(rustc,['--version']);
   assertSuccess(version);
   console.log(version.output.trim());
