@@ -1,6 +1,6 @@
 //! Node-independent course input, native rendering, and CLI.
 use super::{
-    Fence, Heading, Result, callout, fences, highlight, layout, markdown, metadata, navigation,
+    Fence, Heading, Result, callout, fences, highlight, landing, layout, markdown, metadata, navigation,
     page_data, process_fields,
 };
 use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
@@ -561,50 +561,48 @@ fn render(course: &Course, base: &str) -> Result<(Vec<(String, String)>, Value)>
             )
         })
         .collect();
-    let mut fields = vec![base.to_owned()];
-    course.icons(
-        &mut fields,
-        &[
-            ("chevron", 14),
-            ("route", 18),
-            ("book", 16),
-            ("layers", 16),
-            ("target", 24),
-            ("list", 17),
-            ("check", 15),
-            ("chevron", 15),
-        ],
-    )?;
-    add(
-        &mut fields,
-        &[&chapters.first().ok_or("沒有章節")?.entry.path],
-    );
-    number(&mut fields, chapters.len());
-    number(&mut fields, resources.len());
-    for l in resources {
-        let e = &l.entry;
-        add(&mut fields, &[&e.id, &e.path, &e.title, &e.description]);
-    }
-    number(&mut fields, stages.len());
-    for stage in stages {
-        let items = course.stage_chapters(stage)?;
-        add(
-            &mut fields,
-            &[
-                s(stage, "id")?,
-                s(stage, "title")?,
-                s(stage, "description")?,
-            ],
-        );
-        fields.push(course.icon(s(stage, "icon")?, 22)?);
-        number(&mut fields, items.len());
-        for l in items {
-            let e = &l.entry;
-            add(&mut fields, &[&e.id, &e.path, &e.title, &e.description]);
-            flag(&mut fields, e.slug == "ownership");
+    let landing_icons = [
+        course.icon("chevron", 14)?,
+        course.icon("route", 18)?,
+        course.icon("book", 16)?,
+        course.icon("layers", 16)?,
+        course.icon("target", 24)?,
+        course.icon("list", 17)?,
+        course.icon("check", 15)?,
+        course.icon("chevron", 15)?,
+    ];
+    fn entry(l: &Lesson) -> landing::Entry<'_> {
+        landing::Entry {
+            id: &l.entry.id,
+            path: &l.entry.path,
+            title: &l.entry.title,
+            description: &l.entry.description,
         }
     }
-    let mut bodies = packet("landing-v1", 3, fields)?;
+    let landing_stages = stages
+        .iter()
+        .map(|stage| {
+            Ok(landing::Stage {
+                id: s(stage, "id")?,
+                title: s(stage, "title")?,
+                description: s(stage, "description")?,
+                icon: course.icon(s(stage, "icon")?, 22)?,
+                chapters: course
+                    .stage_chapters(stage)?
+                    .into_iter()
+                    .map(|l| (entry(l), l.entry.slug == "ownership"))
+                    .collect(),
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let mut bodies = landing::render(&landing::Landing {
+        base,
+        icons: landing_icons.each_ref().map(String::as_str),
+        first: &chapters.first().ok_or("沒有章節")?.entry.path,
+        chapter_count: chapters.len(),
+        resources: resources.into_iter().map(entry).collect(),
+        stages: landing_stages,
+    })?;
     let mut fields = vec![base.to_owned()];
     course.icons(
         &mut fields,
