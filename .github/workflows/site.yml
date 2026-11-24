@@ -40,6 +40,7 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
+      actions: read
       pages: write
       id-token: write
     concurrency:
@@ -62,19 +63,65 @@ jobs:
       - run: npm run build && npm run check
         env:
           BASE_PATH: ${{ steps.pages.outputs.base_path }}
+      - name: 記錄發布版本
+        run: printf '%s\n' "$GITHUB_SHA" > dist/build-revision.txt
       - uses: actions/upload-pages-artifact@v4
+        id: upload
         with:
           path: dist
+          name: github-pages-${{ github.run_attempt }}
+      - name: 等待 Pages 產物可被 API 查到
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ steps.upload.outputs.artifact_id }}
+          ARTIFACT_NAME: github-pages-${{ github.run_attempt }}
+        shell: bash
+        run: |
+          if [[ ! "$ARTIFACT_ID" =~ ^[0-9]+$ ]]; then
+            echo "::error::Upload did not return a valid artifact ID"
+            exit 1
+          fi
+          for attempt in $(seq 1 15); do
+            if gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?name=$ARTIFACT_NAME" |
+              jq -e --arg id "$ARTIFACT_ID" --arg name "$ARTIFACT_NAME" '
+                (.artifacts | map(select(.name == $name and .expired == false))) as $matches
+                | ($matches | length) == 1 and ($matches[0].id | tostring) == $id
+              ' > /dev/null; then
+              echo "Pages artifact $ARTIFACT_ID is visible (attempt $attempt)"
+              exit 0
+            fi
+            echo "Waiting for Pages artifact metadata (attempt $attempt/15)"
+            if (( attempt < 15 )); then sleep 4; fi
+          done
+          echo "::error::Pages artifact $ARTIFACT_ID is still not visible; retry the workflow"
+          exit 1
       - uses: actions/deploy-pages@v4
         id: deployment
+        with:
+          artifact_name: github-pages-${{ github.run_attempt }}
       - name: 驗證線上入口與章節
         env:
           PAGE_URL: ${{ steps.deployment.outputs.page_url }}
         run: |
           endpoint="${PAGE_URL%/}"
+          # A successful HTTP response may still be the previous deployment.
+          for attempt in $(seq 1 12); do
+            revision="$(curl --fail --silent --show-error --max-time 10 "$endpoint/build-revision.txt?v=$GITHUB_SHA" || true)"
+            if [ "$revision" = "$GITHUB_SHA" ]; then break; fi
+            echo "Waiting for published revision (attempt $attempt/12)"
+            if [ "$attempt" -lt 12 ]; then sleep 5; fi
+          done
+          if [ "$revision" != "$GITHUB_SHA" ]; then
+            echo "::error::Published revision does not match $GITHUB_SHA"
+            exit 1
+          fi
           curl --fail --silent --show-error --retry 4 --retry-all-errors --retry-delay 2 --max-time 20 "$endpoint/" -o /tmp/rust-home.html
           curl --fail --silent --show-error --retry 4 --retry-all-errors --retry-delay 2 --max-time 20 "$endpoint/chapters/ownership/" -o /tmp/rust-ownership.html
           curl --fail --silent --show-error --retry 4 --retry-all-errors --retry-delay 2 --max-time 20 "$endpoint/assets/site.css" -o /tmp/rust-site.css
           grep -Fq 'Rust 學習工坊' /tmp/rust-home.html
           grep -Fq 'ownership-lab' /tmp/rust-ownership.html
+          for kind in context analogy walkthrough warning practice; do
+            grep -Fq "data-callout=\"$kind\"" /tmp/rust-ownership.html
+          done
+          grep -Fq '.lesson-callout' /tmp/rust-site.css
           test -s /tmp/rust-site.css
