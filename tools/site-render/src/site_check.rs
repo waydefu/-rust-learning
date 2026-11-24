@@ -193,7 +193,16 @@ pub(super) fn process_site_check<'a>(
                 hash: field(f)?.to_owned(),
             });
         }
-        pages.push(Page { route, h1, main, lang, missing_alt, ids, notes, links });
+        pages.push(Page {
+            route,
+            h1,
+            main,
+            lang,
+            missing_alt,
+            ids,
+            notes,
+            links,
+        });
     }
     let report = RenderReport {
         layout: field(f)?,
@@ -216,7 +225,12 @@ pub(super) fn process_site_check<'a>(
         index: read_index(f)?,
     };
     let summary = verify(&input)?;
-    for value in [summary.lessons as u64, summary.pages as u64, summary.links as u64, summary.bytes] {
+    for value in [
+        summary.lessons as u64,
+        summary.pages as u64,
+        summary.links as u64,
+        summary.bytes,
+    ] {
         emit(out, &value.to_string())?;
     }
     Ok(())
@@ -306,7 +320,8 @@ pub(super) fn verify(input: &Input<'_>) -> Result<Summary> {
         .filter(|s| s.ends_with(".md"))
         .collect();
     if source_files.len() != input.lessons.len()
-        || input.lessons
+        || input
+            .lessons
             .iter()
             .any(|l| !source_files.contains(&format!("{}.md", l.slug)))
     {
@@ -399,7 +414,11 @@ pub(super) fn verify(input: &Input<'_>) -> Result<Summary> {
     if !report_valid || !has_rust {
         errors.push("Rust 渲染報告不完整".into())
     }
-    if report.renderer != "rust" || report.native != report.total || report.total != total_fences || report.fallback != 0 {
+    if report.renderer != "rust"
+        || report.native != report.total
+        || report.total != total_fences
+        || report.fallback != 0
+    {
         errors.push("Rust 高亮報告未達零回退".into())
     }
     let index = &input.index;
@@ -411,9 +430,12 @@ pub(super) fn verify(input: &Input<'_>) -> Result<Summary> {
     let index_valid = index.len() == input.lessons.len()
         && index.iter().all(|entry| {
             !entry.text.is_empty()
-                && pages
-                    .get(entry.href)
-                    .is_some_and(|p| entry.headings.iter().all(|(id, _)| p.ids.iter().any(|value| value == id)))
+                && pages.get(entry.href).is_some_and(|p| {
+                    entry
+                        .headings
+                        .iter()
+                        .all(|(id, _)| p.ids.iter().any(|value| value == id))
+                })
         });
     if !index_valid {
         errors.push("搜尋索引的頁面或章節定位不完整".into())

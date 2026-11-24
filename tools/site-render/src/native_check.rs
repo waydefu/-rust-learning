@@ -84,22 +84,37 @@ pub(super) fn check(course: &Course, base: &str) -> Result<()> {
     let root = Path::new("dist");
     use super::super::site_check;
     let stages = course.stages()?;
-    let lessons = course.lessons.iter().map(|l| {
-        let e = &l.entry;
-        site_check::Lesson {
-            id: &e.id,
-            slug: &e.slug,
-            path: &e.path,
-            chapter: e.chapter(),
-            resource: e.resource(),
-            stage_count: stages.iter().filter(|st| s(st, "id").ok() == Some(e.group.as_str())).count(),
-            source_id: &e.source_id,
-            source_valid: e.source_valid,
-            headings: l.headings.iter().map(|(level,label,_)| (*level as usize,label.as_str())).collect(),
-            fences: l.examples.iter().map(|ex| (ex.line,ex.markup.as_str(),ex.ending.as_str())).collect(),
-            notes: l.notes.iter().map(String::as_str).collect(),
-        }
-    }).collect();
+    let lessons = course
+        .lessons
+        .iter()
+        .map(|l| {
+            let e = &l.entry;
+            site_check::Lesson {
+                id: &e.id,
+                slug: &e.slug,
+                path: &e.path,
+                chapter: e.chapter(),
+                resource: e.resource(),
+                stage_count: stages
+                    .iter()
+                    .filter(|st| s(st, "id").ok() == Some(e.group.as_str()))
+                    .count(),
+                source_id: &e.source_id,
+                source_valid: e.source_valid,
+                headings: l
+                    .headings
+                    .iter()
+                    .map(|(level, label, _)| (*level as usize, label.as_str()))
+                    .collect(),
+                fences: l
+                    .examples
+                    .iter()
+                    .map(|ex| (ex.line, ex.markup.as_str(), ex.ending.as_str()))
+                    .collect(),
+                notes: l.notes.iter().map(String::as_str).collect(),
+            }
+        })
+        .collect();
     let mut pages = Vec::new();
     let mut names = Vec::new();
     html_files(root, root, &mut names)?;
@@ -118,23 +133,40 @@ pub(super) fn check(course: &Course, base: &str) -> Result<()> {
         let route = format!("{base}{suffix}");
         let html = Html::parse_document(&read(root.join(name))?);
         let nodes: Vec<_> = html.select(&all).collect();
-        let ids = nodes.iter().filter_map(|n| n.value().attr("id"))
-            .filter(|s| !s.is_empty()).map(str::to_owned).collect();
+        let ids = nodes
+            .iter()
+            .filter_map(|n| n.value().attr("id"))
+            .filter(|s| !s.is_empty())
+            .map(str::to_owned)
+            .collect();
         let h1 = nodes.iter().filter(|n| n.value().name() == "h1").count();
         let main = nodes.iter().filter(|n| n.value().name() == "main").count();
-        let lang = html.root_element().value().attr("lang").unwrap_or("").to_owned();
-        let missing_alt = nodes.iter().filter(|n| n.value().name() == "img" && n.value().attr("alt").is_none()).count();
-        let notes = nodes.iter().filter(|n| n.value().attr("data-callout").is_some())
+        let lang = html
+            .root_element()
+            .value()
+            .attr("lang")
+            .unwrap_or("")
+            .to_owned();
+        let missing_alt = nodes
+            .iter()
+            .filter(|n| n.value().name() == "img" && n.value().attr("alt").is_none())
+            .count();
+        let notes = nodes
+            .iter()
+            .filter(|n| n.value().attr("data-callout").is_some())
             .map(|note| {
-                let title = note.select(&note_title)
+                let title = note
+                    .select(&note_title)
                     .find(|t| t.value().attr("class") == Some("callout-title"))
-                    .map(|t| t.text().collect::<String>()).unwrap_or_default();
+                    .map(|t| t.text().collect::<String>())
+                    .unwrap_or_default();
                 site_check::Note {
                     kind: note.value().attr("data-callout").unwrap_or("").to_owned(),
                     role: note.value().attr("role").unwrap_or("").to_owned(),
                     title: title.trim().to_owned(),
                 }
-            }).collect();
+            })
+            .collect();
         let mut links = Vec::new();
         let page = origin.join(&route).map_err(fail)?;
         for node in nodes {
@@ -156,14 +188,26 @@ pub(super) fn check(course: &Course, base: &str) -> Result<()> {
                 hash: decode_fragment(target.fragment().unwrap_or(""))?,
             });
         }
-        pages.push(site_check::Page { route, h1, main, lang, missing_alt, ids, notes, links });
+        pages.push(site_check::Page {
+            route,
+            h1,
+            main,
+            lang,
+            missing_alt,
+            ids,
+            notes,
+            links,
+        });
     }
     let report = load(root.join("build-render-report.json"))?;
     let high = report.get("highlight").ok_or("缺少高亮報告")?;
     let render_report = site_check::RenderReport {
         layout: s(&report, "layout")?,
         pages: num(&report, "pages")?,
-        markdown: list(&report, "markdown")?.iter().map(|item| Ok((s(item,"slug")?,s(item,"renderer")?))).collect::<Result<Vec<_>>>()?,
+        markdown: list(&report, "markdown")?
+            .iter()
+            .map(|item| Ok((s(item, "slug")?, s(item, "renderer")?)))
+            .collect::<Result<Vec<_>>>()?,
         renderer: s(high, "renderer")?,
         native: num(high, "native")?,
         total: num(high, "total")?,
@@ -173,13 +217,24 @@ pub(super) fn check(course: &Course, base: &str) -> Result<()> {
     let shape = index_shape(&index);
     let expected_index = course.index(base);
     let summary = site_check::verify(&site_check::Input {
-        base, lessons, pages, report: render_report, shape_valid: shape,
+        base,
+        lessons,
+        pages,
+        report: render_report,
+        shape_valid: shape,
         expected_index: typed_index(&expected_index)?,
-        index: if shape { typed_index(&index)? } else { Vec::new() },
+        index: if shape {
+            typed_index(&index)?
+        } else {
+            Vec::new()
+        },
     })?;
     println!(
         "{} 份 Markdown、{} 個 HTML、{} 個站內引用與搜尋索引通過，首頁與共用資源 {:.1} kB（未壓縮），BASE_PATH={base}",
-        summary.lessons, summary.pages, summary.links, summary.bytes as f64 / 1000.0
+        summary.lessons,
+        summary.pages,
+        summary.links,
+        summary.bytes as f64 / 1000.0
     );
     Ok(())
 }

@@ -147,6 +147,9 @@ mod tests {
         assert!(process("anchors-v1").is_err());
         assert!(process("unknown\0\x30\0").is_err());
         assert!(process("anchors-v1\0\x30\0extra\0").is_err());
-        assert_eq!(process("anchors-v1\0\x30\0").unwrap(), b"anchors-v1\0\x30\0");
+        assert_eq!(
+            process("anchors-v1\0\x30\0").unwrap(),
+            b"anchors-v1\0\x30\0"
+        );
     }
 }
