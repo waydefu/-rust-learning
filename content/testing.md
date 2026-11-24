@@ -1,0 +1,94 @@
+# 第11章｜測試不是補救，而是把預期寫成可驗證契約
+
+## 一、為什麼編譯通過仍不代表程式正確？
+
+Rust 編譯器能檢查型別與許多記憶體安全條件，但它不知道你要把 20% 折扣算成 80% 原價。邏輯錯誤必須由需求與測試驗證。
+
+比喻：編譯器像檢查橋梁構件是否符合安全規範；測試還要實際確認這座橋「是否通往正確目的地」。
+
+## 二、測試的三個部分：安排、行動、斷言
+
+在 src/lib.rs：
+
+```rust test
+pub fn discount(price: u32, percent: u32) -> Option<u32> {
+    if percent > 100 { return None; }
+    Some(price - (price / 100) * percent)
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn full_discount_is_zero() {
+        assert_eq!(discount(100, 100), Some(0));
+    }
+    #[test]
+    fn invalid_percent_is_none() {
+        assert_eq!(discount(100, 101), None);
+    }
+}
+```
+
+這裡藏著一個刻意的邏輯問題：price / 100 先做整數除法，非整百價格可能被截斷。測試 99 元折 20% 會把問題抓出來。
+
+一種改善是先選擇明確的捨入政策，再用 checked_mul 等方法控制溢位，而不是改成浮點就認為精確。
+
+## 三、各種斷言與失敗資訊
+
+assert!(condition) 檢查真假；assert_eq!(left, right) 檢查相等；assert_ne! 反過來。斷言失敗會讓測試標示失敗並輸出資訊。
+
+```rust test
+#[test]
+fn split_works() {
+    let parts: Vec<_> = "a,b".split(',').collect();
+    assert_eq!(parts, vec!["a", "b"]);
+}
+```
+
+用 cargo test 執行。cargo test -- --nocapture 可以看到平常被捕捉的輸出；cargo test test_name 可按名稱過濾。
+
+## 四、正向測試、邊界測試、錯誤測試
+
+只測「正常輸入」容易錯過真正的漏洞。應考慮：空資料、最小值、最大值、越界、錯誤格式、重複呼叫、極端輸入、不同環境。
+
+對解析函式，測 valid、invalid、empty、overflow。對集合函式，測 0 個、1 個、多個元素。對狀態流程，測每種 enum 變體及非法遷移。
+
+## 五、測試的組織方法
+
+單元測試可放與實作同檔的 #[cfg(test)] 模組，能測試部分私有細節。整合測試放 tests/ 目錄，通常以公開 API 使用函式庫；這幫助檢查封裝是否真的可用。
+
+文件測試（doc test）讓公開 API 範例也能由 cargo test 驗證。
+
+```rust project my_crate:src/lib.rs
+/// 把整數平方。
+/// # Examples
+/// ```
+/// let result = my_crate::square(3);
+/// assert_eq!(result, 9);
+/// ```
+pub fn square(x: i32) -> i32 { x * x }
+```
+
+實務上如果有溢位風險，平方函式也需要定義輸入範圍或改用 checked_mul。
+
+## 六、測試為何應能重複執行？
+
+若測試依賴今日日期、網路回應、外部帳號或其他測試執行先後，就可能變成偶發失敗。盡量隔離 I/O、副作用與時間來源，將核心邏輯寫成純函式。
+
+測試覆蓋率只是輔助指標：覆蓋一行不代表各個判斷分支都正確。更重要的是能否抓出真實可能的回歸。
+
+## 七、TDD 的最小循環
+
+先寫一個會失敗、且明確描述期望的測試（紅燈）；寫最小實作使其通過（綠燈）；再重構並確認測試仍過（整理）。不要為了測試而測試，需以需求為源頭。
+
+## 八、實作／驗收
+
+題1：新增測試 discount(99,20)，說明如何選擇向下取整或四捨五入的政策。
+
+題2：寫 parse_level，測空字串、-1、0、100、101、abc。
+
+題3：將遊戲規則抽到 lib.rs，由 main.rs 只負責 I/O。
+
+驗收：能獨立設計正常、邊界、錯誤三類案例；區分編譯安全與業務正確性；理解單元、整合、文件測試的不同角色。
+
+參考：<https://doc.rust-lang.org/stable/book/ch11-00-testing.html>

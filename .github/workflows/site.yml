@@ -1,0 +1,80 @@
+name: 驗證與發布網站
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: 教材與網站驗證
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm audit --audit-level=high
+      - run: npm run build && npm run check
+      - run: rustup show
+      - run: npm run check:rust
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build && npm run check && npm run test:browser
+        env:
+          BASE_PATH: /-rust-learning/
+
+  deploy:
+    name: 發布 GitHub Pages
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: actions/configure-pages@v5
+        id: pages
+      - run: npm ci
+      - run: npm run build && npm run check
+        env:
+          BASE_PATH: ${{ steps.pages.outputs.base_path }}
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+      - uses: actions/deploy-pages@v4
+        id: deployment
+      - name: 驗證線上入口與章節
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          endpoint="${PAGE_URL%/}"
+          curl --fail --silent --show-error --retry 4 --retry-all-errors --retry-delay 2 --max-time 20 "$endpoint/" -o /tmp/rust-home.html
+          curl --fail --silent --show-error --retry 4 --retry-all-errors --retry-delay 2 --max-time 20 "$endpoint/chapters/ownership/" -o /tmp/rust-ownership.html
+          curl --fail --silent --show-error --retry 4 --retry-all-errors --retry-delay 2 --max-time 20 "$endpoint/assets/site.css" -o /tmp/rust-site.css
+          rg -q 'Rust 學習工坊' /tmp/rust-home.html
+          rg -q 'ownership-lab' /tmp/rust-ownership.html
+          test -s /tmp/rust-site.css

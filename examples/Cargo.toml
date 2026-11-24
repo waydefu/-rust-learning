@@ -1,0 +1,19 @@
+[package]
+name = "external"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+publish = false
+autobins = false
+
+[[bin]]
+name = "random"
+path = "src/bin/random.rs"
+
+[[bin]]
+name = "timer"
+path = "src/bin/timer.rs"
+
+[dependencies]
+rand = "=0.9.5"
+tokio = { version = "=1.54.1", features = ["macros", "rt-multi-thread", "time"] }

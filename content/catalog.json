@@ -1,0 +1,436 @@
+[
+  {
+    "id": "01",
+    "slug": "getting-started",
+    "path": "chapters/getting-started",
+    "title": "開始入門",
+    "description": "安裝工具鏈，從原始碼編譯出第一支程式，理解 Cargo 的角色。",
+    "group": "fundamentals",
+    "source": {
+      "id": "1RynxWyuWV1hdZI1nsyLUJU9vMfoT70Q5Y2hMpr8YTFU",
+      "modified": "2026-11-19T16:06:53.585Z",
+      "paragraphs": 123
+    },
+    "review": "expanded"
+  },
+  {
+    "id": "02",
+    "slug": "guessing-game",
+    "path": "chapters/guessing-game",
+    "title": "猜數字遊戲",
+    "description": "把使用者輸入變成可比較的數字，寫出能反覆玩的遊戲。",
+    "group": "fundamentals",
+    "source": {
+      "id": "1rLBrxLTHSs7kX1znxplz53fYtpt4ONwwjsung58DrEY",
+      "modified": "2026-11-22T14:01:30.438Z",
+      "paragraphs": 62
+    },
+    "review": "migrated"
+  },
+  {
+    "id": "03",
+    "slug": "fundamentals",
+    "path": "chapters/fundamentals",
+    "title": "常見程式概念",
+    "description": "用變數、型別、函式和控制流程表達程式的規則。",
+    "group": "fundamentals",
+    "source": {
+      "id": "1jKe1t03HFbgg5JKE3533Wq89nYwpkVwguL2v1Emr4to",
+      "modified": "2026-11-22T14:01:28.541Z",
+      "paragraphs": 63
+    },
+    "review": "migrated"
+  },
+  {
+    "id": "04",
+    "slug": "ownership",
+    "path": "chapters/ownership",
+    "title": "所有權與借用",
+    "description": "從記憶體配置出發，推導移動、借用與切片的規則。",
+    "group": "fundamentals",
+    "source": {
+      "id": "1in55deyrQkvcgzuxrQOctOboqFmujXo_6R-EFW-Zg9M",
+      "modified": "2026-11-22T14:03:30.190Z",
+      "paragraphs": 87
+    },
+    "review": "expanded"
+  },
+  {
+    "id": "05",
+    "slug": "structs",
+    "path": "chapters/structs",
+    "title": "結構體與方法",
+    "description": "把相關資料綁在一起，讓型別承載模型與行為。",
+    "group": "modeling",
+    "source": {
+      "id": "1ApZEsQDMEnFiJpZxAFmUsi7MzPvbXUVMO1LpUjft9ps",
+      "modified": "2026-11-22T14:03:31.920Z",
+      "paragraphs": 49
+    },
+    "review": "migrated"
+  },
+  {
+    "id": "06",
+    "slug": "enums",
+    "path": "chapters/enums",
+    "title": "列舉與模式配對",
+    "description": "用 Enum 和 match 描述可能狀態，讓分支保持完整。",
+    "group": "modeling",
+    "source": {
+      "id": "19ZHabzDHZNocrQnLXs1_ohOsOqr8-h5fPhENdqKK1eE",
+      "modified": "2026-11-22T14:03:27.902Z",
+      "paragraphs": 60
+    },
+    "review": "migrated"
+  },
+  {
+    "id": "07",
+    "slug": "modules",
+    "path": "chapters/modules",
+    "title": "套件、Crate 與模組",
+    "description": "用模組、可見性與套件分清大型程式的責任。",
+    "group": "modeling",
+    "source": {
+      "id": "1W2wdctMvY_nLPubbF4nkuCS8qtvVmP84IBMMu7A18rE",
+      "modified": "2026-11-22T14:03:34.060Z",
+      "paragraphs": 40
+    },
+    "review": "migrated"
+  },
+  {
+    "id": "08",
+    "slug": "collections",
+    "path": "chapters/collections",
+    "title": "集合與字串",
+    "description": "選擇 Vec、String 和 HashMap，理解資料如何儲存。",
+    "group": "modeling",
+    "source": {
+      "id": "1xe1h2XGu4P7Rh_7XxGef31n23H96HKrQ7kHloJTRBHM",
+      "modified": "2026-11-22T14:05:21.274Z",
+      "paragraphs": 57
+    },
+    "review": "migrated"
+  },
+  {
+    "id": "09",
+    "slug": "errors",
+    "path": "chapters/errors",
+    "title": "錯誤處理",
+    "description": "區分可恢復錯誤與 panic，用 Result 傳遞失敗。",
+    "group": "modeling",
+    "source": {
+      "id": "18hLYhymQjTv0BWozF_OKy5LqE934lAd8qpb-UGtjaQc",
+      "modified": "2026-11-22T14:05:17.187Z",
+      "paragraphs": 49
+    },
+    "review": "migrated"
+  },
+  {
+    "id": "10",
+    "slug": "generics-traits-lifetimes",
+    "path": "chapters/generics-traits-lifetimes",
+    "title": "泛型、Trait 與生命週期",
+    "description": "用泛型重用流程，用 Trait 與生命週期描述條件。",
+    "group": "engineering",
+    "source": {
+      "id": "1yqwKq56IVGiX6pATMluYs75J0Y967JMdFHj9scAymkk",
+      "modified": "2026-11-22T14:05:19.147Z",
+      "paragraphs": 71
+    },
+    "review": "expanded"
+  },
+  {
+    "id": "11",
+    "slug": "testing",
+    "path": "chapters/testing",
+    "title": "自動化測試",
+    "description": "以斷言、邊界條件與整合測試驗證程式規格。",
+    "group": "engineering",
+    "source": {
+      "id": "1rdiuf5gl9KvKvxOkQ2Bh39eU2q6GAX4NCOLBUQ-n-zA",
+      "modified": "2026-11-22T14:07:09.674Z",
+      "paragraphs": 55
+    },
+    "review": "migrated"
+  },
+  {
+    "id": "12",
+    "slug": "cli",
+    "path": "chapters/cli",
+    "title": "命令列工具",
+    "description": "用參數、檔案 I/O 和測試完成可操作的搜尋工具。",
+    "group": "engineering",
+    "source": {
+      "id": "1kW9twlJ3mM-yOkBXHLsqbAQiYctRHZTzRl1Kf-b5H8I",
+      "modified": "2026-11-22T14:07:07.760Z",
+      "paragraphs": 49
+    },
+    "review": "migrated"
+  },
+  {
+    "id": "13",
+    "slug": "iterators",
+    "path": "chapters/iterators",
+    "title": "閉包與迭代器",
+    "description": "追蹤閉包如何捕獲資料，以及迭代器何時真正執行。",
+    "group": "engineering",
+    "source": {
+      "id": "1FHrXuFHxU7iMs1o1fASxJX23rx2jCdCcMdKaRNK2Y5o",
+      "modified": "2026-11-22T14:07:05.976Z",
+      "paragraphs": 49
+    },
+    "review": "migrated"
+  },
+  {
+    "id": "14",
+    "slug": "cargo",
+    "path": "chapters/cargo",
+    "title": "Cargo 與工作空間",
+    "description": "管理依賴、建構設定、工作空間與套件發布。",
+    "group": "engineering",
+    "source": {
+      "id": "1QcL4TkS5tCzL-5TADmzGit1xJ7Kh82VOXRD8PuQWcNw",
+      "modified": "2026-11-22T14:07:11.833Z",
+      "paragraphs": 40
+    },
+    "review": "migrated"
+  },
+  {
+    "id": "15",
+    "slug": "smart-pointers",
+    "path": "chapters/smart-pointers",
+    "title": "智慧指標",
+    "description": "了解 Box、Rc、RefCell 與資源清理的責任。",
+    "group": "systems",
+    "source": {
+      "id": "1IcJ09iuT46QcKqvuPlMlF5Yq5sd7vwdAWIYovRXfn4A",
+      "modified": "2026-11-22T14:08:56.684Z",
+      "paragraphs": 52
+    },
+    "review": "expanded"
+  },
+  {
+    "id": "16",
+    "slug": "concurrency",
+    "path": "chapters/concurrency",
+    "title": "執行緒與並行",
+    "description": "用通道或鎖協調執行緒，理解 Send 和 Sync。",
+    "group": "systems",
+    "source": {
+      "id": "1BzClUjrRehAXKU1v-_akfhS3N9EKfcl9R90y55eXgMc",
+      "modified": "2026-11-22T14:08:58.754Z",
+      "paragraphs": 59
+    },
+    "review": "expanded"
+  },
+  {
+    "id": "17",
+    "slug": "async",
+    "path": "chapters/async",
+    "title": "非同步程式設計",
+    "description": "追蹤 Future、poll 與喚醒，觀察任務如何交錯進展。",
+    "group": "systems",
+    "source": {
+      "id": "1GoHudLLcG3fRR5IplPOqFZVyYr7RKC3-rFFdQ7wJ5cU",
+      "modified": "2026-11-22T14:09:01.119Z",
+      "paragraphs": 52
+    },
+    "review": "expanded"
+  },
+  {
+    "id": "18",
+    "slug": "trait-objects",
+    "path": "chapters/trait-objects",
+    "title": "Trait 物件與狀態",
+    "description": "比較靜態與動態派發，讓型別表達狀態轉移。",
+    "group": "systems",
+    "source": {
+      "id": "1QKAphHTCnVCFjXlnhZ5q6mEz-tpG2ZdRilyyFLbg1XM",
+      "modified": "2026-11-22T14:10:56.424Z",
+      "paragraphs": 58
+    },
+    "review": "migrated"
+  },
+  {
+    "id": "19",
+    "slug": "patterns",
+    "path": "chapters/patterns",
+    "title": "模式與解構",
+    "description": "從資料形狀出發理解解構、守衛與可反駁模式。",
+    "group": "systems",
+    "source": {
+      "id": "1AVYAplRhel9TgB1VheqVISOqIi34P-cm-Nl2GhNJgN8",
+      "modified": "2026-11-22T14:10:52.374Z",
+      "paragraphs": 61
+    },
+    "review": "migrated"
+  },
+  {
+    "id": "20",
+    "slug": "advanced",
+    "path": "chapters/advanced",
+    "title": "進階 Rust",
+    "description": "辨識 unsafe 的安全前提，了解進階 Trait 與巨集。",
+    "group": "systems",
+    "source": {
+      "id": "1it9oY6WwKXOYQVkD0eQnWq5x9QNQoz1176wZLgf-tD8",
+      "modified": "2026-11-22T14:10:58.346Z",
+      "paragraphs": 47
+    },
+    "review": "migrated"
+  },
+  {
+    "id": "21",
+    "slug": "web-server",
+    "path": "chapters/web-server",
+    "title": "多執行緒網頁伺服器",
+    "description": "串起 TCP、HTTP、工作佇列與執行緒池。",
+    "group": "systems",
+    "source": {
+      "id": "15za_YxOXfO0A5WGWwBOQ90KAAsTP0V0BZ80vl-GpuLY",
+      "modified": "2026-11-22T14:10:54.656Z",
+      "paragraphs": 64
+    },
+    "review": "expanded"
+  },
+  {
+    "id": "A01",
+    "slug": "memory-compiler",
+    "path": "resources/memory-compiler",
+    "title": "記憶體與編譯器",
+    "description": "從原始碼追蹤到機器指令，釐清資料儲存模型。",
+    "group": "resources",
+    "source": {
+      "id": "177D_afj6QQHC5qeoqrRav_T3X8Al_2PzOX4nqJVNkZU",
+      "modified": "2026-11-22T14:12:47.609Z",
+      "paragraphs": 47
+    },
+    "review": "migrated"
+  },
+  {
+    "id": "A02",
+    "slug": "diagnostics",
+    "path": "resources/diagnostics",
+    "title": "編譯錯誤診斷",
+    "description": "讀懂診斷的上下文，從錯誤反推程式應有的結構。",
+    "group": "resources",
+    "source": {
+      "id": "1bFKOd8zPbm5b2KNU0E_laideetX2-VQbeGebdxYNcVE",
+      "modified": "2026-11-22T14:12:49.258Z",
+      "paragraphs": 51
+    },
+    "review": "migrated"
+  },
+  {
+    "id": "A03",
+    "slug": "editions",
+    "path": "resources/editions",
+    "title": "Rust 2024 Edition",
+    "description": "區分 Edition、工具鏈與套件版本，了解遷移。",
+    "group": "resources",
+    "source": {
+      "id": "1Gb8fSy__QJThiNyT9vEHffZIOFM6L_IyRniSIx4s5gs",
+      "modified": "2026-11-22T14:12:45.545Z",
+      "paragraphs": 44
+    },
+    "review": "migrated"
+  },
+  {
+    "id": "A04",
+    "slug": "toolchains",
+    "path": "resources/toolchains",
+    "title": "開發環境與工具鏈",
+    "description": "比較 Windows、Linux 與 Android 的執行環境。",
+    "group": "resources",
+    "source": {
+      "id": "1SEgLBOEISRcmdKV0P4ogaUTZA9D8oDD2sP3J9MUSLCk",
+      "modified": "2026-11-22T14:14:18.527Z",
+      "paragraphs": 39
+    },
+    "review": "migrated"
+  },
+  {
+    "id": "A05",
+    "slug": "ecosystem",
+    "path": "resources/ecosystem",
+    "title": "Rust 生態與應用",
+    "description": "掌握 Wasm、嵌入式、後端與遊戲的學習入口。",
+    "group": "resources",
+    "source": {
+      "id": "1HrQJuuCzxVxEdcF4CZiLH8SFARNqlmS2IInoZlEM0Zo",
+      "modified": "2026-11-22T14:14:22.491Z",
+      "paragraphs": 30
+    },
+    "review": "migrated"
+  },
+  {
+    "id": "A06",
+    "slug": "projects",
+    "path": "resources/projects",
+    "title": "分階段實戰與驗收",
+    "description": "以實作與驗收建立獨立開發能力。",
+    "group": "resources",
+    "source": {
+      "id": "1B4CzB6DnXn4VuulRQRWPA-yoNdQ1TmZmMsDa3wwXU3A",
+      "modified": "2026-11-22T14:14:20.317Z",
+      "paragraphs": 36
+    },
+    "review": "migrated"
+  },
+  {
+    "id": "A07",
+    "slug": "syntax",
+    "path": "resources/syntax",
+    "title": "語法與符號字典",
+    "description": "從符號找到語意，回查完整章節的推導。",
+    "group": "resources",
+    "source": {
+      "id": "1GDYIjzkQ-c7BzjRO7aG1iv9PvzNlTXUL5EpvnewqZYM",
+      "modified": "2026-11-22T14:15:31.024Z",
+      "paragraphs": 81
+    },
+    "review": "migrated"
+  },
+  {
+    "id": "A08",
+    "slug": "question-bank",
+    "path": "resources/question-bank",
+    "title": "綜合推理題庫",
+    "description": "先預測編譯與執行結果，再用詳細解答驗證推理。",
+    "group": "resources",
+    "source": {
+      "id": "1d6gplbypM7gQZJns1EhcIo6mO6kMteLp_xROMbmFDr4",
+      "modified": "2026-11-22T14:15:33.068Z",
+      "paragraphs": 88
+    },
+    "review": "migrated"
+  },
+  {
+    "id": "guide",
+    "slug": "guide",
+    "path": "guide",
+    "title": "學習指南",
+    "description": "練習方式、章節路線與自我驗收。",
+    "group": "guide",
+    "source": {
+      "id": "15_OpuAF_Ivt2LgZO35HG39k8TWkKEEwKswp93ovxlXU",
+      "modified": "2026-11-22T14:16:43.674Z",
+      "paragraphs": 36
+    },
+    "review": "migrated"
+  },
+  {
+    "id": "outline",
+    "slug": "outline",
+    "path": "guide/outline",
+    "title": "課程總目錄",
+    "description": "21 章課程與 8 份延伸教材的原始路線。",
+    "group": "guide",
+    "source": {
+      "id": "11je_5pVjjz1h5AvwqYCXEWyjedFzUWQA1sVClWorrYQ",
+      "modified": "2026-11-22T14:16:24.430Z",
+      "paragraphs": 47
+    },
+    "review": "migrated"
+  }
+]

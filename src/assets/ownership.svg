@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="448" height="296" viewBox="0 0 448 296" fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">String 的所有權移動</title>
+  <desc id="desc">執行 let b = a 後，a 失效，b 是 String 的新所有者並指向同一組堆積位元組 R、u、s、t。</desc>
+  <defs>
+    <pattern id="dots" width="16" height="16" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1" fill="#54627e" opacity=".42"/></pattern>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="6.5" refY="4" orient="auto"><path d="M1 1l6 3-6 3" stroke="#ffa17c" stroke-width="1.35" fill="none"/></marker>
+    <linearGradient id="card" x1="11" y1="22" x2="433" y2="275" gradientUnits="userSpaceOnUse"><stop stop-color="#202a41"/><stop offset="1" stop-color="#141c2e"/></linearGradient>
+  </defs>
+  <rect x="1" y="1" width="446" height="294" rx="18" fill="url(#card)" stroke="#3c4860"/>
+  <rect x="2" y="49" width="444" height="245" rx="16" fill="url(#dots)"/>
+  <path d="M1 48h446" stroke="#3c4860"/>
+  <circle cx="21" cy="24" r="3" fill="#f47b58"/><circle cx="33" cy="24" r="3" fill="#e8ad64"/><circle cx="45" cy="24" r="3" fill="#71bda4"/>
+  <g font-family="ui-monospace, monospace" font-size="12">
+    <text x="224" y="28" text-anchor="middle" fill="#cbd5e8">ownership.rs</text>
+    <text x="25" y="77" fill="#ffad90">let</text><text x="52" y="77" fill="#e8edf6">b = a;</text>
+    <text x="42" y="111" fill="#a9b8d3" letter-spacing="1">BINDINGS</text>
+    <text x="274" y="111" fill="#a9b8d3" letter-spacing="1">HEAP BUFFER</text>
+    <rect x="42" y="124" width="150" height="47" rx="8" fill="#1d2639" stroke="#66748c" stroke-dasharray="4 4"/>
+    <text x="55" y="152" fill="#a3aec3">a: String</text><path d="M54 148h66" stroke="#a3aec3" opacity=".7"/><text x="151" y="152" fill="#b1bcd1">moved</text>
+    <rect x="42" y="181" width="150" height="48" rx="8" fill="#3b2b35" stroke="#f38a68"/>
+    <text x="55" y="211" fill="#ffd3c1">b: String</text><circle cx="173" cy="205" r="4" fill="#ffa17c"/>
+    <path d="M192 205h39a7 7 0 0 0 7-7v-19a7 7 0 0 1 7-7h24" stroke="#ffa17c" stroke-width="1.65" marker-end="url(#arrow)"/>
+    <rect x="274" y="146" width="132" height="52" rx="8" fill="#222f49" stroke="#617499"/>
+    <path d="M307 146v52m33-52v52m33-52v52" stroke="#617499"/>
+    <g fill="#edf3ff" text-anchor="middle" font-size="15"><text x="290.5" y="178">R</text><text x="323.5" y="178">u</text><text x="356.5" y="178">s</text><text x="389.5" y="178">t</text></g>
+    <text x="274" y="219" fill="#bac7df">4 UTF-8 bytes</text>
+    <path d="M24 249h400" stroke="#3c4860"/>
+    <circle cx="34" cy="270" r="3" fill="#ffa17c"/><text x="45" y="274" fill="#cbd5e8">b 取得所有權，字串緩衝區未複製</text>
+  </g>
+</svg>
