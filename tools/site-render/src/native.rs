@@ -1,7 +1,7 @@
 //! Node-independent course input, native rendering, and CLI.
 use super::{
     Fence, Heading, Result, callout, fences, highlight, landing, layout, markdown, metadata, navigation,
-    page_data, process_fields,
+    page_data, process_fields, reader,
 };
 use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
 use serde_json::{Value, json};
@@ -430,12 +430,6 @@ impl Course {
             "<svg width=\"{size}\" height=\"{size}\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\">{path}</svg>"
         ))
     }
-    fn icons(&self, fields: &mut Fields, icons: &[(&str, usize)]) -> Result<()> {
-        for (name, size) in icons {
-            fields.push(self.icon(name, *size)?)
-        }
-        Ok(())
-    }
     fn quiz(&self, l: &Lesson) -> Option<&Value> {
         self.data.get("quizzes")?.get(&l.entry.slug)
     }
@@ -603,30 +597,35 @@ fn render(course: &Course, base: &str) -> Result<(Vec<(String, String)>, Value)>
         resources: resources.into_iter().map(entry).collect(),
         stages: landing_stages,
     })?;
-    let mut fields = vec![base.to_owned()];
-    course.icons(
-        &mut fields,
-        &[
-            ("chevron", 14),
-            ("list", 17),
-            ("check", 17),
-            ("target", 18),
-            ("layers", 17),
-            ("chevron", 16),
-        ],
-    )?;
-    number(&mut fields, stages.len());
-    for stage in stages {
-        let items = course.stage_chapters(stage)?;
-        add(&mut fields, &[s(stage, "title")?]);
-        number(&mut fields, items.len());
-        for l in items {
-            add(&mut fields, &[&l.entry.id, &l.entry.path, &l.entry.title]);
-        }
-    }
+    let reader_icons = [
+        course.icon("chevron", 14)?,
+        course.icon("list", 17)?,
+        course.icon("check", 17)?,
+        course.icon("target", 18)?,
+        course.icon("layers", 17)?,
+        course.icon("chevron", 16)?,
+    ];
+    let reader_stages = stages
+        .iter()
+        .map(|stage| {
+            Ok(reader::Stage {
+                title: s(stage, "title")?,
+                chapters: course
+                    .stage_chapters(stage)?
+                    .into_iter()
+                    .map(|l| reader::Chapter {
+                        id: &l.entry.id,
+                        path: &l.entry.path,
+                        title: &l.entry.title,
+                    })
+                    .collect(),
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
     let mut counts: BTreeMap<String, usize> = BTreeMap::new();
     let mut markdown_report = Vec::new();
     let copy = course.icon("copy", 16)?;
+    let mut rendered_lessons = Vec::new();
     for l in &course.lessons {
         let e = &l.entry;
         let stage = stages
@@ -668,62 +667,67 @@ fn render(course: &Course, base: &str) -> Result<(Vec<(String, String)>, Value)>
         } else {
             (String::new(), intro + &rest)
         };
-        add(&mut fields, &[&e.slug]);
-        flag(&mut fields, e.chapter());
-        flag(&mut fields, e.resource());
-        add(
-            &mut fields,
-            &[
-                &e.id,
-                &e.title,
-                &l.title,
-                &e.description,
-                stage_title,
-                &stage_icon,
-                &e.source_id,
-                &intro,
-                &rest,
-            ],
-        );
-        let toc: Vec<_> = l
-            .headings
-            .iter()
-            .filter(|(level, _, _)| *level == 2)
-            .collect();
-        number(&mut fields, toc.len());
-        for (_, label, id) in toc {
-            add(&mut fields, &[id, label]);
-        }
-        flag(&mut fields, e.slug == "ownership");
-        if e.slug == "ownership" {
-            for step in course.ownership()? {
-                add(&mut fields, &[s(step, "code")?, s(step, "message")?]);
-            }
-        }
-        let flow = course.flow(l);
-        flag(&mut fields, flow.is_some());
-        if let Some(f) = flow {
-            add(&mut fields, &[s(f, "title")?, s(f, "caption")?]);
-            let nodes = list(f, "nodes")?;
-            number(&mut fields, nodes.len());
-            for n in nodes {
-                add(&mut fields, &[n.as_str().ok_or("流程圖節點無效")?]);
-            }
-        }
-        let quiz = course.quiz(l);
-        flag(&mut fields, quiz.is_some());
-        if let Some(q) = quiz {
-            add(&mut fields, &[s(q, "prompt")?, s(q, "explanation")?]);
-            let choices = list(q, "choices")?;
-            number(&mut fields, choices.len());
-            number(&mut fields, num(q, "answer")?);
-            for c in choices {
-                add(&mut fields, &[c.as_str().ok_or("測驗選項無效")?]);
-            }
-        }
+        rendered_lessons.push((stage_title, stage_icon, intro, rest));
         markdown_report.push(json!({"slug":e.slug,"renderer":"rust","reason":""}));
     }
-    bodies.extend(packet("reader-v1", course.lessons.len(), fields)?);
+    let reader_lessons = course
+        .lessons
+        .iter()
+        .zip(&rendered_lessons)
+        .map(|(l, (stage_title, stage_icon, intro, rest))| {
+            let e = &l.entry;
+            let kind = if e.chapter() {
+                reader::LessonKind::Chapter
+            } else if e.resource() {
+                reader::LessonKind::Resource
+            } else {
+                reader::LessonKind::Guide
+            };
+            let ownership = if e.slug == "ownership" {
+                let steps = course
+                    .ownership()?
+                    .iter()
+                    .map(|step| Ok((s(step, "code")?, s(step, "message")?)))
+                    .collect::<Result<Vec<_>>>()?;
+                Some(steps.try_into().map_err(|_| "所有權圖須有四個步驟")?)
+            } else {
+                None
+            };
+            let flow = course.flow(l).map(|f| -> Result<reader::Flow<'_>> {
+                Ok(reader::Flow {
+                    title: s(f, "title")?,
+                    caption: s(f, "caption")?,
+                    nodes: list(f, "nodes")?.iter().map(|n| n.as_str().ok_or_else(|| "流程圖節點無效".to_owned())).collect::<Result<Vec<_>>>()?,
+                })
+            }).transpose()?;
+            let quiz = course.quiz(l).map(|q| -> Result<reader::Quiz<'_>> {
+                Ok(reader::Quiz {
+                    prompt: s(q, "prompt")?,
+                    explanation: s(q, "explanation")?,
+                    choices: list(q, "choices")?.iter().map(|c| c.as_str().ok_or_else(|| "測驗選項無效".to_owned())).collect::<Result<Vec<_>>>()?,
+                    answer: num(q, "answer")?,
+                })
+            }).transpose()?;
+            Ok(reader::Lesson {
+                slug: &e.slug,
+                kind,
+                id: &e.id,
+                entry_title: &e.title,
+                title: &l.title,
+                description: &e.description,
+                stage_title,
+                label_icon: stage_icon,
+                source_id: &e.source_id,
+                intro,
+                rest,
+                toc: l.headings.iter().filter(|(level, _, _)| *level == 2).map(|(_, label, id)| (id.as_str(), label.as_str())).collect(),
+                ownership,
+                flow,
+                quiz,
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    bodies.extend(reader::render(base, reader_icons.each_ref().map(String::as_str), &reader_stages, &reader_lessons)?);
     let paths: Vec<_> = chapters
         .iter()
         .map(|l| (l.entry.id.as_str(), l.entry.path.as_str()))
