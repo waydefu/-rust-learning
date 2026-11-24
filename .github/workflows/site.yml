@@ -127,6 +127,26 @@ jobs:
           path: test-results/
           if-no-files-found: ignore
 
+  resolve_lock:
+    name: Cargo 鎖檔診斷（暫時）
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: 由 Cargo 解析精確相依圖
+        shell: bash
+        run: |
+          cargo metadata --format-version 1 --manifest-path tools/site-render/Cargo.toml > /dev/null
+          git diff -- tools/site-render/Cargo.lock
+          cargo metadata --locked --format-version 1 --manifest-path tools/site-render/Cargo.toml > /dev/null
+      - uses: actions/upload-artifact@v4
+        with:
+          name: resolved-site-render-lock
+          path: tools/site-render/Cargo.lock
+
   rust_quality:
     name: Rust 品質與依賴稽核
     runs-on: ubuntu-latest
