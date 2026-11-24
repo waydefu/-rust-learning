@@ -26,12 +26,35 @@ jobs:
       - run: npm audit --audit-level=high
       - run: rustup show
       - run: cargo test --locked --manifest-path tools/lesson-check/Cargo.toml
+      - run: cargo test --locked --manifest-path tools/site-tools/Cargo.toml
       - run: npm run build && npm run check
       - run: npm run check:rust
       - run: npx playwright install --with-deps chromium
       - run: npm run build && npm run check && npm run test:browser
         env:
           BASE_PATH: /-rust-learning/
+      - name: 驗證 Rust 本機預覽伺服器
+        env:
+          BASE_PATH: /-rust-learning/
+          HOST: 127.0.0.1
+          PORT: 4173
+        shell: bash
+        run: |
+          cargo build --locked --manifest-path tools/site-tools/Cargo.toml --bin site-preview
+          tools/site-tools/target/debug/site-preview dist &
+          server=$!
+          trap 'kill "$server" 2>/dev/null || true; wait "$server" 2>/dev/null || true' EXIT
+          url="http://127.0.0.1:4173/-rust-learning"
+          curl --fail --silent --show-error --retry 5 --retry-connrefused --retry-delay 1 --max-time 10 "$url/" -o /tmp/rust-preview-home.html
+          grep -Fq 'Rust 學習工坊' /tmp/rust-preview-home.html
+          curl --fail --silent --show-error --max-time 10 "$url/chapters/ownership/" -o /tmp/rust-preview-lesson.html
+          grep -Fq 'ownership-lab' /tmp/rust-preview-lesson.html
+          curl --fail --silent --show-error --max-time 10 "$url/assets/search-index.json" -o /tmp/rust-preview-search.json
+          cmp dist/assets/search-index.json /tmp/rust-preview-search.json
+          curl --fail --silent --show-error --head --max-time 10 "$url/assets/site.css" | grep -iF 'Content-Type: text/css'
+          test "$(curl --silent --show-error --max-time 10 --output /dev/null --write-out '%{http_code}' "$url/chapters/ownership")" = 308
+          test "$(curl --silent --show-error --max-time 10 --output /dev/null --write-out '%{http_code}' "$url/not-here/")" = 404
+          test "$(curl --path-as-is --silent --show-error --max-time 10 --output /dev/null --write-out '%{http_code}' "$url/%2e%2e/README.md")" = 404
 
   deploy:
     name: 發布 GitHub Pages

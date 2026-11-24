@@ -1,6 +1,7 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
 import { parse } from 'parse5';
+import { isDeepStrictEqual } from 'node:util';
 import { calloutTypes, catalog, chapters, projectRoot, readLesson, resources, stages } from '../src/course.mjs';
 
 const dist = join(projectRoot, 'dist');
@@ -9,6 +10,7 @@ const origin = 'https://rust-learning.test';
 const errors = [];
 const routes = new Map();
 const expectedNotes = new Map();
+const expectedIndex = [];
 const unique = (values) => new Set(values).size === values.length;
 const assets = new Set();
 let checkedLinks = 0;
@@ -30,6 +32,13 @@ if (sourceFiles.length !== catalog.length || catalog.some(entry=>!sourceFiles.in
 for (const entry of catalog) {
   if (!/^[\w-]{20,}$/.test(entry.source.id) || Number.isNaN(Date.parse(entry.source.modified)) || !Number.isInteger(entry.source.paragraphs)) errors.push(`${entry.slug} 缺少有效的來源記錄`);
   const lesson = await readLesson(entry);
+  // Keep the previous JS schema as a compatibility oracle during migration.
+  expectedIndex.push({
+    title: entry.title, id: entry.id, description: entry.description,
+    href: base + entry.path + '/',
+    headings: lesson.headings.filter(heading => heading.level <= 3).map(({id,label}) => ({id,label})),
+    text: lesson.fullText,
+  });
   expectedNotes.set(entry.slug, lesson.tokens.map(token => token.attrGet('data-callout')).filter(Boolean));
   const lines = (await readFile(join(projectRoot,'content',entry.slug+'.md'),'utf8')).split(/\r?\n/);
   if (!lesson.headings.length) errors.push(`${entry.slug} 缺少內容標題`);
@@ -105,6 +114,7 @@ for (const [route, page] of routes) {
 }
 
 const index = JSON.parse(await readFile(join(dist,'assets','search-index.json'),'utf8'));
+if (!isDeepStrictEqual(index, expectedIndex)) errors.push('Rust 搜尋索引與原有資料契約不一致');
 if (index.length !== catalog.length || index.some(entry=>!routes.has(entry.href)||!entry.text||entry.headings.some(heading=>!routes.get(entry.href).ids.has(heading.id)))) {
   errors.push('搜尋索引的頁面或章節定位不完整');
 }

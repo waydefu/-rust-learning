@@ -4,20 +4,21 @@
 
 ## 本機使用
 
-建置網站需要 Node.js 24、Cargo 及 Rust 1.85.1（由 `rust-toolchain.toml` 指定）。Rust 原生工具先驗證教材方塊，現有 Node.js 渲染器再產生靜態網站；一般閱讀只需瀏覽器。
+建置網站需要 Node.js 24、Cargo 及 Rust 1.85.1（由 `rust-toolchain.toml` 指定）。Rust 原生工具驗證教材、產生搜尋索引並提供本機預覽；Node.js 渲染器仍負責 Markdown 解析與 HTML 生成。一般閱讀只需瀏覽器。
 
 ```sh
 npm ci
 npm run dev
 ```
 
-開啟終端機顯示的本機網址。修改教材後重新啟動本機預覽。站內進度和最後閱讀位置儲存在目前瀏覽器及網站來源。
+開啟終端機顯示的本機網址（預設 127.0.0.1:4173）。預覽由 Rust 的 site-preview 提供；修改教材後重新啟動。若需在可信任區域網路上測試手機，可明確設定 HOST=0.0.0.0，勿暴露公網。站內進度和最後閱讀位置儲存在目前瀏覽器及網站來源。
 
 ```sh
 npm run build
 npm run check
 npm run check:rust
 cargo test --locked --manifest-path tools/lesson-check/Cargo.toml
+cargo test --locked --manifest-path tools/site-tools/Cargo.toml
 BASE_PATH=/-rust-learning/ npm run build
 BASE_PATH=/-rust-learning/ npm run check
 npx playwright install chromium
@@ -34,6 +35,7 @@ npm run test:browser
 | [src/](src/) | 頁面模板、圖解、測驗、樣式和瀏覽器互動 |
 | [scripts/](scripts/) | 產生靜態頁面、檢查內容與 Rust 範例 |
 | [tools/lesson-check/](tools/lesson-check/) | Rust 原生教材建置前檢查器 |
+| [tools/site-tools/](tools/site-tools/) | Rust 原生搜尋索引生成與本機 HTTP 預覽 |
 | [examples/](examples/) | 外部 crate 範例的 Cargo 設定與鎖檔。程式碼從教材抽取 |
 | [tests/](tests/) | Playwright 操作與 axe 無障礙檢查 |
 | [.github/workflows/site.yml](.github/workflows/site.yml) | Pull request 驗證與 Pages 部署 |

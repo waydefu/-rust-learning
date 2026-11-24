@@ -10,7 +10,13 @@ CommonMark 可以直接在 GitHub 與 HackMD 編輯。技術圖解使用同庫 S
 
 ## Rust 化的演進方向
 
-目前是混合式建置：Rust 負責教材預檢，Node.js 仍負責 Markdown 解析、語法高亮、HTML 模板及搜尋索引。日後若將建置器逐步移植至 Rust，可評估 pulldown-cmark 等 CommonMark 解析器、模板引擎與高亮方案；先建立輸出相容性測試，再逐步替換。GitHub Pages 只接受靜態輸出，因此不需要改成持續運作的 Rust HTTP 伺服器。瀏覽器中的互動仍使用少量 JavaScript，只有適合的計算模組才評估 Rust/Wasm。維持既有網址、錨點、HackMD 編輯方式及瀏覽器學習紀錄。尚未完成全站 Rust 移植。
+目前是混合式建置：Rust 負責教材預檢、搜尋索引的資料結構與 JSON 生成、本機 HTTP 預覽；Node.js 仍負責 Markdown 解析、語法高亮和 HTML 模板。日後若將建置器逐步移植至 Rust，可評估 pulldown-cmark 等 CommonMark 解析器、模板引擎與高亮方案；先建立輸出相容性測試，再逐步替換。GitHub Pages 只接受靜態輸出，因此不需要改成持續運作的 Rust HTTP 伺服器。瀏覽器中的互動仍使用少量 JavaScript，只有適合的計算模組才評估 Rust/Wasm。維持既有網址、錨點、HackMD 編輯方式及瀏覽器學習紀錄。尚未完成全站 Rust 移植。
+
+### 搜尋索引與預覽介面
+
+`tools/site-tools` 是無第三方依賴的 Rust 2024 crate。現有 Markdown 解析器透過 stdin 傳遞版本化的 UTF-8 欄位（NUL 分隔；建置器拒絕欄位內的 NUL，資料上限 16 MiB），Rust 驗證資料並產生既有 JSON schema，保留標題、診斷碼、程式內容、網址及二至三級錨點。這是過渡介面，未來 Rust Markdown 解析器可直接建立索引資料結構，不必傳輸中間格式。`npm run check` 逐欄比對原先的 JS 索引契約，避免影響搜尋。
+
+`npm run dev` 建置後啟動 Rust `site-preview`，支援 GET/HEAD、子路徑、目錄索引、308、404、MIME 類型與簡單的 HTTP 請求大小及讀寫逾時限制。它只供本機開發，預設綁定 loopback；會解碼並檢查路徑、拒絕遍歷及指向根目錄外的符號連結，但不是完整生產級 HTTP 實作。GitHub Pages 仍直接發布 dist，預覽工具不會在公開網站上執行。CI 會用 curl 實際請求預覽伺服器並比對搜尋索引。
 
 ## HackMD 的編輯方式
 
