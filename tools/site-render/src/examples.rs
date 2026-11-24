@@ -78,9 +78,31 @@ fn command(program: &Path, args: &[&str], cwd: &Path, log: &Path, seconds: u64) 
     // Keep toolchain and platform basics, not arbitrary CI tokens or secrets.
     // This is environment hygiene, not an OS filesystem/network sandbox.
     let allowed = [
-        "PATH", "HOME", "USERPROFILE", "SYSTEMROOT", "WINDIR", "TEMP", "TMP", "TMPDIR",
-        "RUSTUP_HOME", "CARGO_HOME", "CARGO_TARGET_DIR", "RUSTC", "RUSTDOC", "LIB", "LIBPATH",
-        "INCLUDE", "LANG", "LC_ALL", "LC_CTYPE", "TZ", "CC", "CXX", "AR", "RANLIB",
+        "PATH",
+        "HOME",
+        "USERPROFILE",
+        "SYSTEMROOT",
+        "WINDIR",
+        "TEMP",
+        "TMP",
+        "TMPDIR",
+        "RUSTUP_HOME",
+        "RUSTUP_TOOLCHAIN",
+        "CARGO_HOME",
+        "CARGO_TARGET_DIR",
+        "RUSTC",
+        "RUSTDOC",
+        "LIB",
+        "LIBPATH",
+        "INCLUDE",
+        "LANG",
+        "LC_ALL",
+        "LC_CTYPE",
+        "TZ",
+        "CC",
+        "CXX",
+        "AR",
+        "RANLIB",
     ];
     cmd.env_clear().envs(env::vars_os().filter(|(key, _)| {
         allowed
@@ -526,14 +548,16 @@ mod tests {
         assert!(output.success);
         assert_eq!(output.stdout, "ok");
         assert_eq!(output.stderr, "diagnostic");
-        assert!(command(
-            Path::new("/bin/sh"),
-            &["-c", "head -c 1048577 /dev/zero"],
-            &scratch.0,
-            &log,
-            5,
-        )
-        .is_err());
+        assert!(
+            command(
+                Path::new("/bin/sh"),
+                &["-c", "head -c 1048577 /dev/zero"],
+                &scratch.0,
+                &log,
+                5,
+            )
+            .is_err()
+        );
     }
 
     #[test]
