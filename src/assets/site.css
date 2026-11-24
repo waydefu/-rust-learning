@@ -403,8 +403,8 @@ dialog::backdrop { background: #0c1223a8; }
   .hero-figure { animation-delay: .06s; }
   .progress-card { animation-delay: .09s; }
   .chapter-card, .button, .icon-button, .nav-row, .lab-controls button {
-    transition: transform .18s var(--motion-ease), background-color .18s ease,
-      border-color .18s ease, box-shadow .18s ease;
+    /* Do not interpolate theme colors: intermediate light/dark contrast can fail WCAG. */
+    transition: transform .18s var(--motion-ease), box-shadow .18s ease;
   }
   .button:active, .icon-button:active, .lab-controls button:active { transform: scale(.97); }
   @media (hover: hover) and (pointer: fine) {
@@ -429,8 +429,8 @@ dialog::backdrop { background: #0c1223a8; }
   .startup-motion strong { display: block; font-size: .92rem; }
   .startup-motion small { display: block; color: var(--muted); font-size: .72rem; letter-spacing: .06em; }
 }
-@keyframes rust-enter { from { opacity: .75; transform: translateY(7px); } to { opacity: 1; transform: none; } }
-@keyframes rust-dialog { from { opacity: .55; scale: .98; } to { opacity: 1; scale: 1; } }
+@keyframes rust-enter { from { transform: translateY(7px); } to { transform: none; } }
+@keyframes rust-dialog { from { scale: .98; } to { scale: 1; } }
 @keyframes rust-startup {
   0% { opacity: 0; transform: translateY(10px); }
   22%, 68% { opacity: 1; transform: translateY(0); }

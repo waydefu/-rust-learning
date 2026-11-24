@@ -52,7 +52,8 @@ jobs:
         with:
           name: full-app-evidence
           path: .migration-evidence/full-app-*.json
-          if-no-files-found: ignore
+          include-hidden-files: true
+          if-no-files-found: error
       - name: 驗證 Rust 本機預覽伺服器
         env:
           BASE_PATH: /-rust-learning/
