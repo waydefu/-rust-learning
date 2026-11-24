@@ -137,8 +137,23 @@ mod tests {
 
     #[test]
     fn schema_rejects_wrong_types_and_unknown_fields() {
-        assert!(serde_json::from_str::<Quiz>(r#"{"prompt":"Q","choices":["A"],"answer":"0","explanation":"E"}"#).is_err());
-        assert!(serde_json::from_str::<Quiz>(r#"{"prompt":"Q","choices":["A"],"answer":0,"explanation":"E","typo":true}"#).is_err());
-        assert!(serde_json::from_str::<Quiz>(r#"{"prompt":"Q","choices":["A"],"answer":0,"explanation":"E"}"#).is_ok());
+        assert!(
+            serde_json::from_str::<Quiz>(
+                r#"{"prompt":"Q","choices":["A"],"answer":"0","explanation":"E"}"#
+            )
+            .is_err()
+        );
+        assert!(
+            serde_json::from_str::<Quiz>(
+                r#"{"prompt":"Q","choices":["A"],"answer":0,"explanation":"E","typo":true}"#
+            )
+            .is_err()
+        );
+        assert!(
+            serde_json::from_str::<Quiz>(
+                r#"{"prompt":"Q","choices":["A"],"answer":0,"explanation":"E"}"#
+            )
+            .is_ok()
+        );
     }
 }

@@ -1,10 +1,10 @@
 //! Node-independent course input, native rendering, and CLI.
+use super::schema;
 use super::{
     Fence, Heading, Result, callout, fences, highlight, landing, layout, markdown, metadata,
     navigation, page_data, reader,
 };
 use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
-use super::schema;
 use serde::de::DeserializeOwned;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -348,13 +348,10 @@ impl Course {
             return Err("章節及延伸教材編號不完整".into());
         }
         let stages = result.stages();
-        if chapters.iter().any(|l| {
-            stages
-                .iter()
-                .filter(|st| st.id == l.entry.group)
-                .count()
-                != 1
-        }) {
+        if chapters
+            .iter()
+            .any(|l| stages.iter().filter(|st| st.id == l.entry.group).count() != 1)
+        {
             return Err("教材群組不完整".into());
         }
         let files = fs::read_dir("content")
@@ -384,7 +381,11 @@ impl Course {
             .collect()
     }
     fn icon(&self, name: &str, size: usize) -> Result<String> {
-        let path = self.data.icons.get(name).ok_or_else(|| format!("未知圖示 {name}"))?;
+        let path = self
+            .data
+            .icons
+            .get(name)
+            .ok_or_else(|| format!("未知圖示 {name}"))?;
         Ok(format!(
             "<svg width=\"{size}\" height=\"{size}\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\">{path}</svg>"
         ))
@@ -399,15 +400,25 @@ impl Course {
         &self.data.ownership_steps
     }
     fn index(&self, base: &str) -> Vec<schema::SearchEntry> {
-        self.lessons.iter().map(|l| schema::SearchEntry {
-            title: l.entry.title.clone(),
-            id: l.entry.id.clone(),
-            description: l.entry.description.clone(),
-            href: l.entry.href(base),
-            text: l.full_text.clone(),
-            headings: l.headings.iter().filter(|(level, _, _)| *level <= 3)
-                .map(|(_, label, id)| schema::SearchHeading { id: id.clone(), label: label.clone() }).collect(),
-        }).collect()
+        self.lessons
+            .iter()
+            .map(|l| schema::SearchEntry {
+                title: l.entry.title.clone(),
+                id: l.entry.id.clone(),
+                description: l.entry.description.clone(),
+                href: l.entry.href(base),
+                text: l.full_text.clone(),
+                headings: l
+                    .headings
+                    .iter()
+                    .filter(|(level, _, _)| *level <= 3)
+                    .map(|(_, label, id)| schema::SearchHeading {
+                        id: id.clone(),
+                        label: label.clone(),
+                    })
+                    .collect(),
+            })
+            .collect()
     }
     fn preflight(&self) -> Result<()> {
         let names: Vec<_> = self
@@ -594,14 +605,9 @@ fn render(course: &Course, base: &str) -> Result<(Vec<(String, String)>, schema:
     let mut rendered_lessons = Vec::new();
     for l in &course.lessons {
         let e = &l.entry;
-        let stage = stages
-            .iter()
-            .find(|st| st.id == e.group);
+        let stage = stages.iter().find(|st| st.id == e.group);
         let stage_title = stage.map(|st| st.title.as_str()).unwrap_or("");
-        let stage_icon = course.icon(
-            stage.map(|st| st.icon.as_str()).unwrap_or("book"),
-            17,
-        )?;
+        let stage_icon = course.icon(stage.map(|st| st.icon.as_str()).unwrap_or("book"), 17)?;
         let mut rendered = Vec::new();
         for ex in &l.examples {
             let lang = ex.info.split_whitespace().next().unwrap_or("");
@@ -634,7 +640,11 @@ fn render(course: &Course, base: &str) -> Result<(Vec<(String, String)>, schema:
             (String::new(), intro + &rest)
         };
         rendered_lessons.push((stage_title, stage_icon, intro, rest));
-        markdown_report.push(schema::MarkdownReport { slug: e.slug.clone(), renderer: "rust".into(), reason: String::new() });
+        markdown_report.push(schema::MarkdownReport {
+            slug: e.slug.clone(),
+            renderer: "rust".into(),
+            reason: String::new(),
+        });
     }
     let reader_lessons = course
         .lessons
@@ -650,7 +660,12 @@ fn render(course: &Course, base: &str) -> Result<(Vec<(String, String)>, schema:
                 reader::LessonKind::Guide
             };
             let ownership = if e.slug == "ownership" {
-                Some(course.ownership().each_ref().map(|step| (step.code.as_str(), step.message.as_str())))
+                Some(
+                    course
+                        .ownership()
+                        .each_ref()
+                        .map(|step| (step.code.as_str(), step.message.as_str())),
+                )
             } else {
                 None
             };
@@ -705,14 +720,20 @@ fn render(course: &Course, base: &str) -> Result<(Vec<(String, String)>, schema:
             let l = course.lessons.iter().find(|l| l.entry.path == p.current);
             let chapter = l.filter(|l| l.entry.chapter()).map(|l| l.entry.id.as_str());
             let ownership = if l.is_some_and(|l| l.entry.slug == "ownership") {
-                Some(course.ownership().iter().map(|step| page_data::OwnershipStep {
-                    code: &step.code,
-                    source: &step.source,
-                    target: &step.target,
-                    owner: step.owner.as_deref().filter(|v| !v.is_empty()),
-                    borrowed: step.borrowed,
-                    message: &step.message,
-                }).collect())
+                Some(
+                    course
+                        .ownership()
+                        .iter()
+                        .map(|step| page_data::OwnershipStep {
+                            code: &step.code,
+                            source: &step.source,
+                            target: &step.target,
+                            owner: step.owner.as_deref().filter(|v| !v.is_empty()),
+                            borrowed: step.borrowed,
+                            message: &step.message,
+                        })
+                        .collect(),
+                )
             } else {
                 None
             };
@@ -759,13 +780,27 @@ fn render(course: &Course, base: &str) -> Result<(Vec<(String, String)>, schema:
     let total: usize = counts.values().sum();
     let by_language: BTreeMap<_, _> = counts
         .into_iter()
-        .map(|(k, n)| (k, schema::LanguageCount { native: n, total: n }))
+        .map(|(k, n)| {
+            (
+                k,
+                schema::LanguageCount {
+                    native: n,
+                    total: n,
+                },
+            )
+        })
         .collect();
     let report = schema::RenderReport {
         layout: "rust".into(),
         pages: pages.len(),
         markdown: markdown_report,
-        highlight: schema::HighlightReport { renderer: "rust".into(), native: total, total, fallback: 0, by_language },
+        highlight: schema::HighlightReport {
+            renderer: "rust".into(),
+            native: total,
+            total,
+            fallback: 0,
+            by_language,
+        },
     };
     Ok((
         pages

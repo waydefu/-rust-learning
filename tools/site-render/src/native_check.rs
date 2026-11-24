@@ -45,14 +45,20 @@ fn decode_fragment(s: &str) -> Result<String> {
 }
 fn typed_index(v: &[schema::SearchEntry]) -> Vec<super::super::site_check::IndexEntry<'_>> {
     use super::super::site_check::IndexEntry;
-    v.iter().map(|e| IndexEntry {
-        title: &e.title,
-        id: &e.id,
-        description: &e.description,
-        href: &e.href,
-        text: &e.text,
-        headings: e.headings.iter().map(|h| (h.id.as_str(), h.label.as_str())).collect(),
-    }).collect()
+    v.iter()
+        .map(|e| IndexEntry {
+            title: &e.title,
+            id: &e.id,
+            description: &e.description,
+            href: &e.href,
+            text: &e.text,
+            headings: e
+                .headings
+                .iter()
+                .map(|h| (h.id.as_str(), h.label.as_str()))
+                .collect(),
+        })
+        .collect()
 }
 pub(super) fn check(course: &Course, base: &str) -> Result<()> {
     let root = Path::new("dist");
@@ -69,10 +75,7 @@ pub(super) fn check(course: &Course, base: &str) -> Result<()> {
                 path: &e.path,
                 chapter: e.chapter(),
                 resource: e.resource(),
-                stage_count: stages
-                    .iter()
-                    .filter(|st| st.id == e.group)
-                    .count(),
+                stage_count: stages.iter().filter(|st| st.id == e.group).count(),
                 source_id: &e.source_id,
                 source_valid: e.source_valid,
                 headings: l
@@ -178,7 +181,11 @@ pub(super) fn check(course: &Course, base: &str) -> Result<()> {
     let render_report = site_check::RenderReport {
         layout: &report.layout,
         pages: report.pages,
-        markdown: report.markdown.iter().map(|item| (item.slug.as_str(), item.renderer.as_str())).collect(),
+        markdown: report
+            .markdown
+            .iter()
+            .map(|item| (item.slug.as_str(), item.renderer.as_str()))
+            .collect(),
         renderer: &high.renderer,
         native: high.native,
         total: high.total,
