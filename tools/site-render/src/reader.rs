@@ -36,10 +36,17 @@ fn read_quiz<'a>(f: &mut impl Iterator<Item = &'a str>) -> Result<Option<Quiz<'a
     let n = count(f, 100)?;
     let answer = count(f, 100)?;
     let choices = (0..n).map(|_| field(f)).collect::<Result<Vec<_>>>()?;
-    Ok(Some(Quiz { prompt, explanation, choices, answer }))
+    Ok(Some(Quiz {
+        prompt,
+        explanation,
+        choices,
+        answer,
+    }))
 }
 fn quiz(data: Option<&Quiz<'_>>, slug: &str, icon: &str) -> Result<String> {
-    let Some(data) = data else { return Ok(String::new()) };
+    let Some(data) = data else {
+        return Ok(String::new());
+    };
     let prompt = escape(data.prompt);
     let explanation = escape(data.explanation);
     let n = data.choices.len();
@@ -80,11 +87,15 @@ fn read_flow<'a>(f: &mut impl Iterator<Item = &'a str>) -> Result<Option<Flow<'a
     Ok(Some(Flow {
         title: field(f)?,
         caption: field(f)?,
-        nodes: (0..count(f, 100)?).map(|_| field(f)).collect::<Result<Vec<_>>>()?,
+        nodes: (0..count(f, 100)?)
+            .map(|_| field(f))
+            .collect::<Result<Vec<_>>>()?,
     }))
 }
 fn flow(data: Option<&Flow<'_>>, icon: &str) -> Result<String> {
-    let Some(data) = data else { return Ok(String::new()) };
+    let Some(data) = data else {
+        return Ok(String::new());
+    };
     let title = escape(data.title);
     let caption = escape(data.caption);
     let mut nodes = String::new();
@@ -113,7 +124,9 @@ fn read_ownership<'a>(f: &mut impl Iterator<Item = &'a str>) -> Result<Option<Ow
     ]))
 }
 fn ownership(data: Option<&Ownership<'_>>, icon: &str) -> Result<String> {
-    let Some(data) = data else { return Ok(String::new()) };
+    let Some(data) = data else {
+        return Ok(String::new());
+    };
     let (mut buttons, mut steps, mut first_code, mut first_message) =
         (String::new(), String::new(), String::new(), String::new());
     for (i, label) in ["建立", "移動", "借用", "釋放"].into_iter().enumerate() {
@@ -254,7 +267,11 @@ pub(super) fn process_reader<'a>(
         let title = field(f)?;
         let mut chapters = Vec::new();
         for _ in 0..count(f, 1000)? {
-            chapters.push(Chapter { id: field(f)?, path: field(f)?, title: field(f)? });
+            chapters.push(Chapter {
+                id: field(f)?,
+                path: field(f)?,
+                title: field(f)?,
+            });
         }
         stages.push(Stage { title, chapters });
     }
@@ -279,13 +296,20 @@ pub(super) fn process_reader<'a>(
             source_id: field(f)?,
             intro: field(f)?,
             rest: field(f)?,
-            toc: (0..count(f, 5000)?).map(|_| Ok((field(f)?, field(f)?))).collect::<Result<Vec<_>>>()?,
+            toc: (0..count(f, 5000)?)
+                .map(|_| Ok((field(f)?, field(f)?)))
+                .collect::<Result<Vec<_>>>()?,
             ownership: read_ownership(f)?,
             flow: read_flow(f)?,
             quiz: read_quiz(f)?,
         });
     }
-    for html in render(base, [chevron, list, check, target, layers, flow_icon], &stages, &lessons)? {
+    for html in render(
+        base,
+        [chevron, list, check, target, layers, flow_icon],
+        &stages,
+        &lessons,
+    )? {
         emit(out, &html)?;
     }
     Ok(())
@@ -387,32 +411,32 @@ pub(super) fn render(
             String::new()
         };
         out.push(fill(
-                include_str!("../templates/reader.html"),
-                &[
-                    ("base", base),
-                    ("chevron", chevron),
-                    ("resourceCrumb", &crumb),
-                    ("entryTitle", &entry_title),
-                    ("labelIcon", label_icon),
-                    ("label", &label),
-                    ("stage", &stage),
-                    ("title", &title),
-                    ("description", &description),
-                    ("list", list),
-                    ("outline", &outline),
-                    ("extra", &extra),
-                    ("outlineLinks", outline_links),
-                    ("ownership", &lab),
-                    ("intro", intro),
-                    ("flow", &flow),
-                    ("rest", rest),
-                    ("quiz", &quiz),
-                    ("completion", &completion),
-                    ("source", &source),
-                    ("pagination", &pagination),
-                    ("footer", &footer),
-                ],
-            )?);
+            include_str!("../templates/reader.html"),
+            &[
+                ("base", base),
+                ("chevron", chevron),
+                ("resourceCrumb", &crumb),
+                ("entryTitle", &entry_title),
+                ("labelIcon", label_icon),
+                ("label", &label),
+                ("stage", &stage),
+                ("title", &title),
+                ("description", &description),
+                ("list", list),
+                ("outline", &outline),
+                ("extra", &extra),
+                ("outlineLinks", outline_links),
+                ("ownership", &lab),
+                ("intro", intro),
+                ("flow", &flow),
+                ("rest", rest),
+                ("quiz", &quiz),
+                ("completion", &completion),
+                ("source", &source),
+                ("pagination", &pagination),
+                ("footer", &footer),
+            ],
+        )?);
     }
     Ok(out)
 }

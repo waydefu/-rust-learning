@@ -157,7 +157,13 @@ pub(super) fn process_landing<'a>(
             };
             chapters.push((e, featured));
         }
-        stages.push(Stage { id, title, description, icon, chapters });
+        stages.push(Stage {
+            id,
+            title,
+            description,
+            icon,
+            chapters,
+        });
     }
     let input = Landing {
         base,
@@ -203,7 +209,13 @@ pub(super) fn render(input: &Landing<'_>) -> Result<Vec<String>> {
     let mut found_first = false;
     let mut stage_ids = HashSet::new();
     for stage in &input.stages {
-        let Stage { id, title, description, icon, chapters } = stage;
+        let Stage {
+            id,
+            title,
+            description,
+            icon,
+            chapters,
+        } = stage;
         let (id, title, description) = (*id, *title, *description);
         if !safe_path(id) || id.contains('/') || !stage_ids.insert(id) {
             return Err("課程群組無效".into());

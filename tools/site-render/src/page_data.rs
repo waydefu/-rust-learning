@@ -48,11 +48,7 @@ pub(super) struct PageData<'a> {
     pub answer: Option<usize>,
 }
 
-pub(super) fn render(
-    base: &str,
-    paths: &[(&str, &str)],
-    data: &PageData<'_>,
-) -> String {
+pub(super) fn render(base: &str, paths: &[(&str, &str)], data: &PageData<'_>) -> String {
     let mut page = String::from("{");
     property(&mut page, "base", base);
     page.push_str(",\"chapterPaths\":[");
@@ -144,7 +140,18 @@ pub(super) fn process_data<'a>(
         let answer = optional(field(f)?)
             .map(|v| v.parse::<usize>().map_err(|_| "測驗索引無效".to_owned()))
             .transpose()?;
-        emit(out, &render(base, &paths, &PageData { chapter, ownership, answer }))?;
+        emit(
+            out,
+            &render(
+                base,
+                &paths,
+                &PageData {
+                    chapter,
+                    ownership,
+                    answer,
+                },
+            ),
+        )?;
     }
     Ok(())
 }

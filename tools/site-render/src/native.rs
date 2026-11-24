@@ -1,7 +1,7 @@
 //! Node-independent course input, native rendering, and CLI.
 use super::{
-    Fence, Heading, Result, callout, fences, highlight, landing, layout, markdown, metadata, navigation,
-    page_data, process_fields, reader,
+    Fence, Heading, Result, callout, fences, highlight, landing, layout, markdown, metadata,
+    navigation, page_data, process_fields, reader,
 };
 use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
 use serde_json::{Value, json};
@@ -693,21 +693,33 @@ fn render(course: &Course, base: &str) -> Result<(Vec<(String, String)>, Value)>
             } else {
                 None
             };
-            let flow = course.flow(l).map(|f| -> Result<reader::Flow<'_>> {
-                Ok(reader::Flow {
-                    title: s(f, "title")?,
-                    caption: s(f, "caption")?,
-                    nodes: list(f, "nodes")?.iter().map(|n| n.as_str().ok_or_else(|| "流程圖節點無效".to_owned())).collect::<Result<Vec<_>>>()?,
+            let flow = course
+                .flow(l)
+                .map(|f| -> Result<reader::Flow<'_>> {
+                    Ok(reader::Flow {
+                        title: s(f, "title")?,
+                        caption: s(f, "caption")?,
+                        nodes: list(f, "nodes")?
+                            .iter()
+                            .map(|n| n.as_str().ok_or_else(|| "流程圖節點無效".to_owned()))
+                            .collect::<Result<Vec<_>>>()?,
+                    })
                 })
-            }).transpose()?;
-            let quiz = course.quiz(l).map(|q| -> Result<reader::Quiz<'_>> {
-                Ok(reader::Quiz {
-                    prompt: s(q, "prompt")?,
-                    explanation: s(q, "explanation")?,
-                    choices: list(q, "choices")?.iter().map(|c| c.as_str().ok_or_else(|| "測驗選項無效".to_owned())).collect::<Result<Vec<_>>>()?,
-                    answer: num(q, "answer")?,
+                .transpose()?;
+            let quiz = course
+                .quiz(l)
+                .map(|q| -> Result<reader::Quiz<'_>> {
+                    Ok(reader::Quiz {
+                        prompt: s(q, "prompt")?,
+                        explanation: s(q, "explanation")?,
+                        choices: list(q, "choices")?
+                            .iter()
+                            .map(|c| c.as_str().ok_or_else(|| "測驗選項無效".to_owned()))
+                            .collect::<Result<Vec<_>>>()?,
+                        answer: num(q, "answer")?,
+                    })
                 })
-            }).transpose()?;
+                .transpose()?;
             Ok(reader::Lesson {
                 slug: &e.slug,
                 kind,
@@ -720,14 +732,24 @@ fn render(course: &Course, base: &str) -> Result<(Vec<(String, String)>, Value)>
                 source_id: &e.source_id,
                 intro,
                 rest,
-                toc: l.headings.iter().filter(|(level, _, _)| *level == 2).map(|(_, label, id)| (id.as_str(), label.as_str())).collect(),
+                toc: l
+                    .headings
+                    .iter()
+                    .filter(|(level, _, _)| *level == 2)
+                    .map(|(_, label, id)| (id.as_str(), label.as_str()))
+                    .collect(),
                 ownership,
                 flow,
                 quiz,
             })
         })
         .collect::<Result<Vec<_>>>()?;
-    bodies.extend(reader::render(base, reader_icons.each_ref().map(String::as_str), &reader_stages, &reader_lessons)?);
+    bodies.extend(reader::render(
+        base,
+        reader_icons.each_ref().map(String::as_str),
+        &reader_stages,
+        &reader_lessons,
+    )?);
     let paths: Vec<_> = chapters
         .iter()
         .map(|l| (l.entry.id.as_str(), l.entry.path.as_str()))
@@ -747,7 +769,10 @@ fn render(course: &Course, base: &str) -> Result<(Vec<(String, String)>, Value)>
                                 code: s(step, "code")?,
                                 source: s(step, "source")?,
                                 target: s(step, "target")?,
-                                owner: step.get("owner").and_then(Value::as_str).filter(|v| !v.is_empty()),
+                                owner: step
+                                    .get("owner")
+                                    .and_then(Value::as_str)
+                                    .filter(|v| !v.is_empty()),
                                 borrowed: step.get("borrowed").and_then(Value::as_bool),
                                 message: s(step, "message")?,
                             })
@@ -788,7 +813,17 @@ fn render(course: &Course, base: &str) -> Result<(Vec<(String, String)>, Value)>
     let html = pages
         .iter()
         .enumerate()
-        .map(|(i, p)| layout(base, &p.title, &p.description, &nav[i], &bodies[i], &data[i], &icons))
+        .map(|(i, p)| {
+            layout(
+                base,
+                &p.title,
+                &p.description,
+                &nav[i],
+                &bodies[i],
+                &data[i],
+                &icons,
+            )
+        })
         .collect::<Result<Vec<_>>>()?;
     let total: usize = counts.values().sum();
     let by_language: BTreeMap<_, _> = counts
