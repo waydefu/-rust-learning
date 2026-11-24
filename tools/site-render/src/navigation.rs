@@ -1,15 +1,15 @@
 //! Native sidebar renderer. Icons are trusted static SVG from the icon library.
 use super::{Result, count, emit, escape, field};
 
-struct Chapter<'a> {
-    id: &'a str,
-    path: &'a str,
-    title: &'a str,
+pub(super) struct Chapter<'a> {
+    pub(super) id: &'a str,
+    pub(super) path: &'a str,
+    pub(super) title: &'a str,
 }
-struct Stage<'a> {
-    id: &'a str,
-    title: &'a str,
-    chapters: Vec<Chapter<'a>>,
+pub(super) struct Stage<'a> {
+    pub(super) id: &'a str,
+    pub(super) title: &'a str,
+    pub(super) chapters: Vec<Chapter<'a>>,
 }
 
 fn safe_path(s: &str) -> bool {
@@ -40,7 +40,7 @@ fn row(base: &str, path: &str, label: &str, icon: &str, current: &str, meta: &st
         current_attr(current == path)
     )
 }
-fn navigation(
+pub(super) fn navigation(
     base: &str,
     stages: &[Stage<'_>],
     resources: usize,

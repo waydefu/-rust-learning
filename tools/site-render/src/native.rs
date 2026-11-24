@@ -1,6 +1,7 @@
 //! Node-independent course input, native rendering, and CLI.
 use super::{
-    Fence, Heading, Result, callout, fences, highlight, markdown, metadata, process_fields,
+    Fence, Heading, Result, callout, fences, highlight, layout, markdown, metadata, navigation,
+    page_data, process_fields,
 };
 use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
 use serde_json::{Value, json};
@@ -521,30 +522,45 @@ fn render(course: &Course, base: &str) -> Result<(Vec<(String, String)>, Value)>
     let resources = course.resources();
     let stages = course.stages()?;
     let pages = pages(course);
-    let mut fields = vec![base.to_owned(), resources.len().to_string()];
-    course.icons(
-        &mut fields,
-        &[
-            ("home", 19),
-            ("route", 19),
-            ("layers", 19),
-            ("down", 16),
-            ("check", 14),
-        ],
-    )?;
-    number(&mut fields, stages.len());
-    for stage in stages {
-        let items = course.stage_chapters(stage)?;
-        add(&mut fields, &[s(stage, "id")?, s(stage, "title")?]);
-        number(&mut fields, items.len());
-        for l in items {
-            add(&mut fields, &[&l.entry.id, &l.entry.path, &l.entry.title]);
-        }
-    }
-    for p in &pages {
-        add(&mut fields, &[&p.current, &p.id]);
-    }
-    let nav = packet("navigation-v1", pages.len(), fields)?;
+    let nav_icons = [
+        course.icon("home", 19)?,
+        course.icon("route", 19)?,
+        course.icon("layers", 19)?,
+        course.icon("down", 16)?,
+        course.icon("check", 14)?,
+    ];
+    let nav_icons = nav_icons.each_ref().map(String::as_str);
+    let nav_stages = stages
+        .iter()
+        .map(|stage| {
+            Ok(navigation::Stage {
+                id: s(stage, "id")?,
+                title: s(stage, "title")?,
+                chapters: course
+                    .stage_chapters(stage)?
+                    .into_iter()
+                    .map(|l| navigation::Chapter {
+                        id: &l.entry.id,
+                        path: &l.entry.path,
+                        title: &l.entry.title,
+                    })
+                    .collect(),
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let nav: Vec<_> = pages
+        .iter()
+        .map(|p| {
+            navigation::navigation(
+                base,
+                &nav_stages,
+                resources.len(),
+                &nav_icons,
+                &p.current,
+                &p.id,
+            )
+        })
+        .collect();
     let mut fields = vec![base.to_owned()];
     course.icons(
         &mut fields,
@@ -710,73 +726,68 @@ fn render(course: &Course, base: &str) -> Result<(Vec<(String, String)>, Value)>
         markdown_report.push(json!({"slug":e.slug,"renderer":"rust","reason":""}));
     }
     bodies.extend(packet("reader-v1", course.lessons.len(), fields)?);
-    let mut fields = vec![base.to_owned()];
-    number(&mut fields, chapters.len());
-    for l in chapters {
-        add(&mut fields, &[&l.entry.id, &l.entry.path]);
-    }
-    for p in &pages {
-        let l = course.lessons.iter().find(|l| l.entry.path == p.current);
-        let chapter = l
-            .filter(|l| l.entry.chapter())
-            .map(|l| l.entry.id.as_str())
-            .unwrap_or("");
-        let ownership = l.is_some_and(|l| l.entry.slug == "ownership");
-        add(&mut fields, &[chapter]);
-        flag(&mut fields, ownership);
-        if ownership {
-            let steps = course.ownership()?;
-            number(&mut fields, steps.len());
-            for step in steps {
-                add(
-                    &mut fields,
-                    &[
-                        s(step, "code")?,
-                        s(step, "source")?,
-                        s(step, "target")?,
-                        step.get("owner").and_then(Value::as_str).unwrap_or(""),
-                    ],
-                );
-                fields.push(
-                    step.get("borrowed")
-                        .and_then(Value::as_bool)
-                        .map(|b| b.to_string())
-                        .unwrap_or_default(),
-                );
-                add(&mut fields, &[s(step, "message")?]);
-            }
-        }
-        fields.push(
-            l.and_then(|l| course.quiz(l))
-                .map(|q| num(q, "answer").map(|v| v.to_string()))
-                .transpose()?
-                .unwrap_or_default(),
-        );
-    }
-    let data = packet("page-data-v1", pages.len(), fields)?;
+    let paths: Vec<_> = chapters
+        .iter()
+        .map(|l| (l.entry.id.as_str(), l.entry.path.as_str()))
+        .collect();
+    let data = pages
+        .iter()
+        .map(|p| {
+            let l = course.lessons.iter().find(|l| l.entry.path == p.current);
+            let chapter = l.filter(|l| l.entry.chapter()).map(|l| l.entry.id.as_str());
+            let ownership = if l.is_some_and(|l| l.entry.slug == "ownership") {
+                Some(
+                    course
+                        .ownership()?
+                        .iter()
+                        .map(|step| {
+                            Ok(page_data::OwnershipStep {
+                                code: s(step, "code")?,
+                                source: s(step, "source")?,
+                                target: s(step, "target")?,
+                                owner: step.get("owner").and_then(Value::as_str).filter(|v| !v.is_empty()),
+                                borrowed: step.get("borrowed").and_then(Value::as_bool),
+                                message: s(step, "message")?,
+                            })
+                        })
+                        .collect::<Result<Vec<_>>>()?,
+                )
+            } else {
+                None
+            };
+            let answer = l
+                .and_then(|l| course.quiz(l))
+                .map(|q| num(q, "answer"))
+                .transpose()?;
+            Ok(page_data::render(
+                base,
+                &paths,
+                &page_data::PageData {
+                    chapter,
+                    ownership,
+                    answer,
+                },
+            ))
+        })
+        .collect::<Result<Vec<_>>>()?;
     if nav.len() != pages.len() || bodies.len() != pages.len() || data.len() != pages.len() {
         return Err("頁面數量不相容".into());
     }
-    let mut fields = vec![base.to_owned()];
-    course.icons(
-        &mut fields,
-        &[
-            ("menu", 20),
-            ("search", 19),
-            ("sun", 20),
-            ("moon", 20),
-            ("github", 20),
-            ("close", 20),
-            ("search", 20),
-        ],
-    )?;
-    for (i, p) in pages.iter().enumerate() {
-        add(
-            &mut fields,
-            &[&p.title, &p.description, &nav[i], &bodies[i], &data[i]],
-        );
-    }
-    let html = packet("layout-v1", pages.len(), fields)?;
+    let icons = [
+        course.icon("menu", 20)?,
+        course.icon("search", 19)?,
+        course.icon("sun", 20)?,
+        course.icon("moon", 20)?,
+        course.icon("github", 20)?,
+        course.icon("close", 20)?,
+        course.icon("search", 20)?,
+    ];
+    let icons = icons.each_ref().map(String::as_str);
+    let html = pages
+        .iter()
+        .enumerate()
+        .map(|(i, p)| layout(base, &p.title, &p.description, &nav[i], &bodies[i], &data[i], &icons))
+        .collect::<Result<Vec<_>>>()?;
     let total: usize = counts.values().sum();
     let by_language: BTreeMap<_, _> = counts
         .into_iter()

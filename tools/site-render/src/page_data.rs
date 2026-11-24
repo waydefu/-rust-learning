@@ -33,70 +33,118 @@ fn flag<'a>(f: &mut impl Iterator<Item = &'a str>) -> Result<bool> {
         _ => Err("頁面資料旗標無效".into()),
     }
 }
+pub(super) struct OwnershipStep<'a> {
+    pub code: &'a str,
+    pub source: &'a str,
+    pub target: &'a str,
+    pub owner: Option<&'a str>,
+    pub borrowed: Option<bool>,
+    pub message: &'a str,
+}
+
+pub(super) struct PageData<'a> {
+    pub chapter: Option<&'a str>,
+    pub ownership: Option<Vec<OwnershipStep<'a>>>,
+    pub answer: Option<usize>,
+}
+
+pub(super) fn render(
+    base: &str,
+    paths: &[(&str, &str)],
+    data: &PageData<'_>,
+) -> String {
+    let mut page = String::from("{");
+    property(&mut page, "base", base);
+    page.push_str(",\"chapterPaths\":[");
+    for (i, (id, path)) in paths.iter().enumerate() {
+        if i != 0 {
+            page.push(',')
+        }
+        page.push('[');
+        string(&mut page, id);
+        page.push(',');
+        string(&mut page, path);
+        page.push(']');
+    }
+    page.push(']');
+    if let Some(chapter) = data.chapter {
+        page.push(',');
+        property(&mut page, "chapter", chapter);
+    }
+    if let Some(steps) = &data.ownership {
+        page.push_str(",\"ownershipSteps\":[");
+        for (i, step) in steps.iter().enumerate() {
+            if i != 0 {
+                page.push(',')
+            }
+            page.push('{');
+            property(&mut page, "code", step.code);
+            page.push(',');
+            property(&mut page, "source", step.source);
+            page.push(',');
+            property(&mut page, "target", step.target);
+            page.push_str(",\"owner\":");
+            if let Some(owner) = step.owner {
+                string(&mut page, owner);
+            } else {
+                page.push_str("null");
+            }
+            if let Some(borrowed) = step.borrowed {
+                write!(&mut page, ",\"borrowed\":{borrowed}").unwrap();
+            }
+            page.push(',');
+            property(&mut page, "message", step.message);
+            page.push('}');
+        }
+        page.push(']');
+    }
+    if let Some(answer) = data.answer {
+        write!(&mut page, ",\"answer\":{answer}").unwrap();
+    }
+    page.push('}');
+    page
+}
+
+fn optional(value: &str) -> Option<&str> {
+    (!value.is_empty()).then_some(value)
+}
+
 pub(super) fn process_data<'a>(
     n: usize,
     f: &mut impl Iterator<Item = &'a str>,
     out: &mut Vec<String>,
 ) -> Result<()> {
-    let mut shared = String::from("{");
-    property(&mut shared, "base", field(f)?);
-    shared.push_str(",\"chapterPaths\":[");
-    for i in 0..count(f, 1000)? {
-        if i != 0 {
-            shared.push(',')
-        }
-        shared.push('[');
-        string(&mut shared, field(f)?);
-        shared.push(',');
-        string(&mut shared, field(f)?);
-        shared.push(']');
-    }
-    shared.push(']');
+    let base = field(f)?;
+    let paths = (0..count(f, 1000)?)
+        .map(|_| Ok((field(f)?, field(f)?)))
+        .collect::<Result<Vec<_>>>()?;
     for _ in 0..n {
-        let mut page = shared.clone();
-        let chapter = field(f)?;
-        if !chapter.is_empty() {
-            page.push(',');
-            property(&mut page, "chapter", chapter);
-        }
-        if flag(f)? {
-            page.push_str(",\"ownershipSteps\":[");
-            for i in 0..count(f, 100)? {
-                if i != 0 {
-                    page.push(',')
-                }
-                page.push('{');
-                property(&mut page, "code", field(f)?);
-                page.push(',');
-                property(&mut page, "source", field(f)?);
-                page.push(',');
-                property(&mut page, "target", field(f)?);
-                page.push_str(",\"owner\":");
-                let owner = field(f)?;
-                if owner.is_empty() {
-                    page.push_str("null")
-                } else {
-                    string(&mut page, owner)
-                }
-                match field(f)? {
-                    "" => {}
-                    "true" => page.push_str(",\"borrowed\":true"),
-                    "false" => page.push_str(",\"borrowed\":false"),
-                    _ => return Err("借用旗標無效".into()),
-                }
-                page.push(',');
-                property(&mut page, "message", field(f)?);
-                page.push('}');
+        let chapter = optional(field(f)?);
+        let ownership = if flag(f)? {
+            let mut steps = Vec::new();
+            for _ in 0..count(f, 100)? {
+                steps.push(OwnershipStep {
+                    code: field(f)?,
+                    source: field(f)?,
+                    target: field(f)?,
+                    owner: optional(field(f)?),
+                    borrowed: match field(f)? {
+                        "" => None,
+                        "true" => Some(true),
+                        "false" => Some(false),
+                        _ => return Err("借用旗標無效".into()),
+                    },
+                    message: field(f)?,
+                });
             }
-            page.push(']');
-        }
-        let answer = field(f)?;
-        if !answer.is_empty() {
-            let answer = answer.parse::<usize>().map_err(|_| "測驗索引無效")?;
-            write!(&mut page, ",\"answer\":{answer}").unwrap();
-        }
-        page.push('}');
-        emit(out, &page)?;
+            Some(steps)
+        } else {
+            None
+        };
+        let answer = optional(field(f)?)
+            .map(|v| v.parse::<usize>().map_err(|_| "測驗索引無效".to_owned()))
+            .transpose()?;
+        emit(out, &render(base, &paths, &PageData { chapter, ownership, answer }))?;
     }
     Ok(())
 }
