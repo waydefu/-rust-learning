@@ -1,0 +1,14 @@
+<div class="reader-page">
+      <div class="breadcrumb"><a href="{{base}}">課程總覽</a>{{chevron}}{{resourceCrumb}}<span>{{entryTitle}}</span></div>
+      <div class="reader-grid"><article class="reader">
+        <header class="lesson-head"><div class="lesson-label">{{labelIcon}} <span>{{label}}{{stage}}</span></div>
+        <h1>{{title}}</h1><p>{{description}}</p></header>
+        <details class="mobile-toc"><summary>{{list}} 本章目錄</summary><nav aria-label="本章目錄（手機）">{{outline}}</nav></details>
+        <div class="prose">{{extra}}{{outlineLinks}}{{ownership}}{{intro}}{{flow}}{{rest}}</div>
+        {{quiz}}
+        {{completion}}
+        <p class="source-link">教材來源 <a href="{{source}}">Google Drive 原始文件</a></p>
+        {{pagination}}
+      </article><aside class="desktop-toc"><nav aria-label="本章目錄"><h2>本章目錄</h2>{{outline}}</nav></aside></div>
+      {{footer}}
+    </div>

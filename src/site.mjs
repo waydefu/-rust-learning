@@ -156,11 +156,18 @@ export function makeSite(base, {nativeLayout = false} = {}) {
       </article><aside class="desktop-toc"><nav aria-label="本章目錄"><h2>本章目錄</h2>${outline}</nav></aside></div>
       ${footer()}
     </div>`;
-    return layout({current:entry.path,id:entry.id,title:entry.title,description:entry.description,body,data:{
+    const spec = layout({current:entry.path,id:entry.id,title:entry.title,description:entry.description,body,data:{
       ...(isChapter ? {chapter:entry.id} : {}),
       ...(isOwnership ? {ownershipSteps} : {}),
       ...(quizzes[entry.slug] ? {answer:quizzes[entry.slug].answer} : {}),
     }});
+    if (nativeLayout) spec.reader = {label, stageTitle:stage?.title ?? '', labelIcon:icon(stage?.icon ?? 'book',17),
+      intro:firstPart, rest, outline, extra, outlineLinks,
+      pagination: isChapter ? `<nav class="chapter-pagination" aria-label="相鄰章節">
+        ${previous ? `<a href="${url(previous.path)}"><small>上一章</small><strong>${previous.title}</strong></a>` : `<a href="${url('guide')}"><small>開始之前</small><strong>學習指南</strong></a>`}
+        ${next ? `<a href="${url(next.path)}"><small>下一章</small><strong>${next.title}</strong></a>` : `<a href="${url('resources')}"><small>繼續學習</small><strong>延伸資源</strong></a>`}</nav>` : '',
+    };
+    return spec;
   }
 
   function missing() {

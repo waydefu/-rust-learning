@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { parseFragment } from 'parse5';
 import { md, projectRoot, renderTokens, chapters, resources, stages } from './course.mjs';
 import { icon } from './icons.mjs';
+import { flows, quizzes, ownershipSteps } from './learning-labs.mjs';
 import { isDeepStrictEqual } from 'node:util';
 
 function invoke(mode, count, fields) {
@@ -186,4 +187,26 @@ export function applyNativeLanding(base, specs) {
     specs[i].body = result[i];
   }
   console.log('Rust 首頁與延伸資源模板逐字比對：2 頁通過');
+}
+
+export function applyNativeReaders(base, specs, lessons) {
+  const fields = [base, icon('chevron',14),icon('list',17),icon('check',17),icon('target',18),icon('layers',17),icon('chevron',16)];
+  for (let i=0; i<lessons.length; i++) {
+    const {entry,title}=lessons[i], p=specs[i].reader;
+    fields.push(entry.slug,String(chapters.includes(entry)),String(resources.includes(entry)),entry.title,title,entry.description,p.label,p.stageTitle,p.labelIcon,entry.source.id,p.intro,p.rest,p.outline,p.extra,p.outlineLinks,p.pagination);
+    const ownership=entry.slug==='ownership';
+    fields.push(String(ownership));
+    if (ownership) for (const step of ownershipSteps) fields.push(step.code,step.message);
+    const f=flows[entry.slug]; fields.push(String(Boolean(f)));
+    if (f) fields.push(f.title,f.caption,String(f.nodes.length),...f.nodes);
+    const q=quizzes[entry.slug]; fields.push(String(Boolean(q)));
+    if(q) fields.push(q.prompt,q.explanation,String(q.choices.length),String(q.answer),...q.choices);
+  }
+  const result=invoke('reader-v1',lessons.length,fields);
+  if(result.length!==specs.length) throw new Error('Rust 閱讀頁數量不一致');
+  for(let i=0;i<specs.length;i++){
+    if(result[i]!==specs[i].body) throw new Error('Rust 閱讀頁與原版不一致：'+specs[i].current);
+    specs[i].body=result[i];
+  }
+  console.log('Rust 閱讀頁及互動模板逐字比對：'+specs.length+' 頁通過');
 }

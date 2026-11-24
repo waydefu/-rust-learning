@@ -27,7 +27,7 @@ export function ownershipLab() {
 </section>`;
 }
 
-const flows = {
+export const flows = {
   'getting-started': { title: '從原始碼到程序', nodes: ['main.rs', 'rustc 與連結器', '執行檔', '作業系統載入', 'CPU 執行'], caption: 'Cargo 負責安排建構。編譯成功之後，作業系統可再次載入同一個執行檔。' },
   'generics-traits-lifetimes': { title: '回傳借用的有效範圍', nodes: ['呼叫端擁有 x 與 y', 'x、y 都可借用的區間', "longest 回傳 &'a str", '最後一次使用回傳值'], caption: "相同的 'a 讓呼叫端只能在兩個輸入都有效的區間內使用結果。標註不會延長任何資料的存活時間。" },
   'smart-pointers': { title: 'Rc 共享配置的釋放時機', nodes: ['Rc::new：strong = 1', 'Rc::clone：strong = 2', '第一個擁有者 drop：strong = 1', '最後一個擁有者 drop：strong = 0'], caption: '強引用計數歸零時銷毀內部值。若仍有 Weak，管理計數的配置會等最後一個 Weak 釋放後才回收。' },
