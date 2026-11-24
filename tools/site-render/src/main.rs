@@ -7,6 +7,8 @@ mod metadata;
 mod navigation;
 mod landing;
 mod reader;
+mod highlight;
+mod fences;
 
 type Result<T> = std::result::Result<T, String>;
 const LIMIT: u64 = 64 * 1024 * 1024;
@@ -210,6 +212,8 @@ fn process(input: &str) -> Result<Vec<u8>> {
         "navigation-v1" => navigation::process_navigation(n, &mut fields, &mut result)?,
         "landing-v1" => landing::process_landing(n, &mut fields, &mut result)?,
         "reader-v1" => reader::process_reader(n, &mut fields, &mut result)?,
+        "highlight-v1" => highlight::process_highlight(n, &mut fields, &mut result)?,
+        "fences-v1" => fences::process_fences(n, &mut fields, &mut result)?,
         "markdown-v1" => {
             for _ in 0..n {
                 let source = field(&mut fields)?;

@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { catalog, chapters, md, projectRoot, readLesson } from '../src/course.mjs';
 import { makeSite } from '../src/site.mjs';
-import { applyNativeMetadata, applyNativeNavigation, applyNativeLanding, applyNativeReaders, renderNativeBodies, renderNativeLayouts } from '../src/native-render.mjs';
+import { applyNativeMetadata, applyNativeNavigation, applyNativeLanding, applyNativeReaders, applyNativeFences, renderNativeBodies, renderNativeLayouts } from '../src/native-render.mjs';
 
 const inputBase = process.env.BASE_PATH || '/';
 if (!/^\/(?:[\w.-]+\/)*[\w.-]*\/?$/.test(inputBase) || inputBase.startsWith('//') || inputBase.split('/').some(segment => ['.', '..'].includes(segment))) {
@@ -18,6 +18,7 @@ execFileSync(process.env.CARGO || 'cargo', [
 ], { cwd: projectRoot, stdio: 'inherit' });
 const lessons = await Promise.all(catalog.map(readLesson));
 applyNativeMetadata(lessons);
+applyNativeFences(lessons);
 const renderReport = renderNativeBodies(lessons);
 
 // Keep Markdown parsing in the existing renderer for now. Native Rust owns

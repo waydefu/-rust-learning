@@ -4,6 +4,8 @@ import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { catalog, projectRoot, readLesson } from '../src/course.mjs';
 
+import { applyNativeFences } from '../src/native-render.mjs';
+
 const root = mkdtempSync(join(tmpdir(), 'rust-lessons-'));
 const rustc = process.env.RUSTC || 'rustc';
 const cargo = process.env.CARGO || 'cargo';
@@ -113,10 +115,12 @@ try {
   const version = command(rustc,['--version']);
   assertSuccess(version);
   console.log(version.output.trim());
-  for (const entry of catalog) {
-    const lesson = await readLesson(entry);
+  const lessons = await Promise.all(catalog.map(readLesson));
+  applyNativeFences(lessons);
+  for (const lesson of lessons) {
+    const {entry} = lesson;
     let previous;
-    for (const token of lesson.tokens.filter(token => token.type === 'fence')) {
+    for (const token of lesson.nativeFences) {
       const [language, mode, argument] = token.info.trim().split(/\s+/);
       if (language !== 'rust') { previous = undefined; continue; }
       try { verifySnippet(mode, argument, token.content, previous); }

@@ -4,6 +4,8 @@ import { parse } from 'parse5';
 import { isDeepStrictEqual } from 'node:util';
 import { calloutTypes, catalog, chapters, projectRoot, readLesson, resources, stages } from '../src/course.mjs';
 
+import { applyNativeFences } from '../src/native-render.mjs';
+
 const dist = join(projectRoot, 'dist');
 const base = (process.env.BASE_PATH || '/').replace(/\/?$/, '/');
 const origin = 'https://rust-learning.test';
@@ -29,9 +31,11 @@ if (stages.flatMap(stage=>stage.chapters).length !== chapters.length) errors.pus
 const sourceFiles = (await readdir(join(projectRoot,'content'))).filter(name => name.endsWith('.md'));
 if (sourceFiles.length !== catalog.length || catalog.some(entry=>!sourceFiles.includes(entry.slug + '.md'))) errors.push('Markdown 檔案與 catalog.json 不一致');
 
-for (const entry of catalog) {
+const lessons = await Promise.all(catalog.map(readLesson));
+applyNativeFences(lessons);
+for (const lesson of lessons) {
+  const {entry} = lesson;
   if (!/^[\w-]{20,}$/.test(entry.source.id) || Number.isNaN(Date.parse(entry.source.modified)) || !Number.isInteger(entry.source.paragraphs)) errors.push(`${entry.slug} 缺少有效的來源記錄`);
-  const lesson = await readLesson(entry);
   // Keep the previous JS schema as a compatibility oracle during migration.
   expectedIndex.push({
     title: entry.title, id: entry.id, description: entry.description,
@@ -47,7 +51,7 @@ for (const entry of catalog) {
     if (heading.level > headingLevel + 1) errors.push(`${entry.slug} 標題層級跳躍 ${heading.label}`);
     headingLevel = heading.level;
   }
-  for (const token of lesson.tokens.filter(token=>token.type==='fence')) {
+  for (const token of lesson.nativeFences) {
     const start = token.map[0] + 1;
     const ending = lines[token.map[1] - 1].trim();
     if (!ending.startsWith(token.markup) || [...ending].some(char=>char!==token.markup[0])) errors.push(`${entry.slug}.md:${start} 缺少程式碼結尾`);

@@ -54,14 +54,18 @@ md.core.ruler.after('inline', 'lesson_callouts', state => {
     tokens[i + 1].attrSet('class', 'callout-title');
   }
 });
+export function highlightCode(token) {
+  const [language] = token.info.trim().split(/\s+/);
+  return hljs.getLanguage(language)
+    ? hljs.highlight(token.content, { language, ignoreIllegals: true }).value
+    : escape(token.content);
+}
 md.renderer.rules.fence = (tokens, index) => {
   const token = tokens[index];
   const [language, mode] = token.info.trim().split(/\s+/);
   const name = { rust: 'Rust', bash: 'Shell', toml: 'TOML', text: '文字' }[language] ?? '程式碼';
   const note = { fragment: '片段', continuation: '接續範例', test: '測試片段', project: '專案範例', error: '編譯反例', exercise: '練習反例', run: '' }[mode];
-  const highlighted = hljs.getLanguage(language)
-    ? hljs.highlight(token.content, { language, ignoreIllegals: true }).value
-    : escape(token.content);
+  const highlighted = highlightCode(token);
   return `<div class="code-block"><div class="code-header"><span>${name}${note ? ` <small>${note}</small>` : ''}</span><button type="button" class="copy-button" data-copy hidden>${icon('copy', 16)}<span>複製</span></button></div><pre tabindex="0" aria-label="${name}程式碼"><code class="language-${escape(language)}">${highlighted}</code></pre></div>\n`;
 };
 

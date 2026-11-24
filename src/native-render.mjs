@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { parseFragment } from 'parse5';
-import { md, projectRoot, renderTokens, chapters, resources, stages } from './course.mjs';
+import { md, projectRoot, renderTokens, chapters, resources, stages, highlightCode } from './course.mjs';
 import { icon } from './icons.mjs';
 import { flows, quizzes, ownershipSteps } from './learning-labs.mjs';
 import { isDeepStrictEqual } from 'node:util';
@@ -61,13 +61,15 @@ export const equivalentMarkup = (a, b) =>
 
 export function renderNativeBodies(lessons) {
   const fields = [];
+  const codeReport = applyNativeHighlighting(lessons);
+  let fenceIndex = 0;
   for (const lesson of lessons) {
     fields.push(lesson.source, String(lesson.headings.length));
     for (const h of lesson.headings) fields.push(String(h.level), h.id);
     const fences = lesson.tokens.filter(token => token.type === 'fence');
     fields.push(String(fences.length));
     for (const token of fences) {
-      fields.push(token.info.trim(), token.content, md.renderer.rules.fence([token], 0));
+      fields.push(token.info.trim(), token.content, codeReport.blocks[fenceIndex++]);
     }
   }
   const result = invoke('markdown-v1', lessons.length, fields);
@@ -209,4 +211,41 @@ export function applyNativeReaders(base, specs, lessons) {
     specs[i].body=result[i];
   }
   console.log('Rust 閱讀頁及互動模板逐字比對：'+specs.length+' 頁通過');
+}
+
+export function applyNativeHighlighting(lessons) {
+  const tokens = lessons.flatMap(lesson => lesson.tokens.filter(token => token.type === 'fence'));
+  const fields = [icon('copy',16)];
+  for (const token of tokens) fields.push(token.info.trim(),token.content,highlightCode(token));
+  const output = invoke('highlight-v1',tokens.length,fields);
+  if(output.length!==tokens.length*2) throw new Error('Rust 程式區塊回傳數量不一致');
+  let native=0;
+  const blocks=tokens.map((token,i)=>{
+    const original=md.renderer.rules.fence([token],0);
+    const [candidate,wrapped]=output.slice(i*2,i*2+2);
+    if(wrapped!==original) throw new Error('Rust 程式區塊外框不相容：'+token.info);
+    if(candidate===original){native++;return candidate;}
+    return wrapped;
+  });
+  console.log('Rust 高亮逐字相容：'+native+'/'+tokens.length+'；其餘保留原高亮，全部使用 Rust 程式區塊外框');
+  return {blocks,native,total:tokens.length};
+}
+
+export function applyNativeFences(lessons) {
+  const original=lessons.map(lesson=>lesson.tokens.filter(token=>token.type==='fence'));
+  const fields=lessons.flatMap((lesson,i)=>[lesson.source,String(original[i].length)]);
+  const result=invoke('fences-v1',lessons.length,fields);
+  let cursor=0,total=0;
+  for(let i=0;i<lessons.length;i++){
+    const count=Number(result[cursor++]);
+    if(count!==original[i].length) throw new Error('Rust 範例數量不同：'+lessons[i].entry.slug);
+    lessons[i].nativeFences=original[i].map(token=>{
+      const info=result[cursor++],content=result[cursor++];
+      if(info!==token.info.trim()||content!==token.content) throw new Error('Rust 範例內容不同：'+lessons[i].entry.slug);
+      total++;
+      return {...token,info,content};
+    });
+  }
+  if(cursor!==result.length) throw new Error('Rust 範例回傳多餘欄位');
+  console.log('Rust 範例抽取與標注驗證：'+total+' 段逐字比對通過');
 }
