@@ -28,6 +28,20 @@ fn check_note(title:&str,role:&str)->bool{
     role=="note"&&!title.trim().is_empty()&&!title.contains("callout:")
         &&!matches!(title.trim(),"來龍去脈"|"生活比喻"|"程式拆解"|"常見陷阱"|"動手驗收")
 }
+
+#[derive(PartialEq,Eq)]
+struct IndexEntry<'a>{title:&'a str,id:&'a str,description:&'a str,href:&'a str,text:&'a str,headings:Vec<(&'a str,&'a str)>}
+fn read_index<'a>(f:&mut impl Iterator<Item=&'a str>)->Result<Vec<IndexEntry<'a>>>{
+    let mut entries=Vec::new();
+    for _ in 0..count(f,1000)?{
+        let [title,id,description,href,text]=[field(f)?,field(f)?,field(f)?,field(f)?,field(f)?];
+        let mut headings=Vec::new();
+        for _ in 0..count(f,5000)?{headings.push((field(f)?,field(f)?));}
+        entries.push(IndexEntry{title,id,description,href,text,headings});
+    }
+    Ok(entries)
+}
+
 pub(super) fn process_site_check<'a>(n:usize,f:&mut impl Iterator<Item=&'a str>,out:&mut Vec<u8>)->Result<()>{
     let base=field(f)?;
     if !base.starts_with('/')||!base.ends_with('/')||base.starts_with("//")
@@ -128,13 +142,12 @@ pub(super) fn process_site_check<'a>(n:usize,f:&mut impl Iterator<Item=&'a str>,
         has_rust |= renderer=="rust";
     }
     if !report_valid||!has_rust{errors.push("Rust 渲染報告不完整".into())}
-    let index_count=count(f,1000)?;
-    let mut index_valid=index_count==lessons.len();
-    for _ in 0..index_count{
-        let href=field(f)?;let text=field(f)?;
-        let headings=strings(f,5000)?;
-        index_valid &= !text.is_empty()&&pages.get(href).is_some_and(|p|headings.iter().all(|id|p.ids.contains(id)));
-    }
+    let shape_valid=flag(f)?;
+    let expected_index=read_index(f)?;
+    let index=read_index(f)?;
+    if !shape_valid||index!=expected_index{errors.push("Rust 搜尋索引與原有資料契約不一致".into())}
+    let index_valid=index.len()==lessons.len()&&index.iter().all(|entry|!entry.text.is_empty()&&
+        pages.get(entry.href).is_some_and(|p|entry.headings.iter().all(|(id,_)|p.ids.contains(id))));
     if !index_valid{errors.push("搜尋索引的頁面或章節定位不完整".into())}
     let mut initial=vec!["index.html"];
     initial.extend(assets.iter().copied().filter(|s|!s.ends_with(".json")));

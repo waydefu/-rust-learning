@@ -1,7 +1,6 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join, sep } from 'node:path';
 import { parse } from 'parse5';
-import { isDeepStrictEqual } from 'node:util';
 import { catalog, chapters, projectRoot, readLesson, resources, stages } from '../src/course.mjs';
 import { applyNativeFences, verifyNativeSite } from '../src/native-render.mjs';
 
@@ -63,8 +62,22 @@ const report=JSON.parse(await readFile(join(dist,'build-render-report.json'),'ut
 fields.push(report.layout,String(report.pages),String(report.markdown.length));
 for(const item of report.markdown) fields.push(item.slug,item.renderer);
 const index=JSON.parse(await readFile(join(dist,'assets','search-index.json'),'utf8'));
-if(!isDeepStrictEqual(index,expectedIndex))throw new Error('Rust 搜尋索引與原有資料契約不一致');
-fields.push(String(index.length));
-for(const entry of index)fields.push(entry.href,entry.text,String(entry.headings.length),...entry.headings.map(h=>h.id));
+// Convert JSON values to typed transport fields; Rust decides equality.
+const hasKeys=(value,keys)=>value!==null&&typeof value==='object'&&!Array.isArray(value)&&
+  Object.keys(value).length===keys.length&&keys.every(key=>Object.hasOwn(value,key));
+const textKeys=['title','id','description','href','text'];
+const shape=Array.isArray(index)&&index.every(entry=>hasKeys(entry,[...textKeys,'headings'])&&
+  textKeys.every(k=>typeof entry[k]==='string')&&Array.isArray(entry.headings)&&
+  entry.headings.every(h=>hasKeys(h,['id','label'])&&typeof h.id==='string'&&typeof h.label==='string'));
+function sendIndex(entries){
+  fields.push(String(entries.length));
+  for(const entry of entries){
+    fields.push(...textKeys.map(k=>entry[k]),String(entry.headings.length),
+      ...entry.headings.flatMap(h=>[h.id,h.label]));
+  }
+}
+fields.push(String(shape));
+sendIndex(expectedIndex);
+sendIndex(shape?index:[]);
 const [count,pages,links,bytes]=verifyNativeSite(names.length,fields);
 console.log(count+' 份 Markdown、'+pages+' 個 HTML、'+links+' 個站內引用與搜尋索引通過，首頁與共用資源 '+(bytes/1000).toFixed(1)+' kB（未壓縮），BASE_PATH='+base);
