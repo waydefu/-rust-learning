@@ -83,7 +83,7 @@ export function makeSite(base) {
       <div class="hero-copy">
         <div class="edition"><span></span> RUST 2024 EDITION</div>
         <h1 id="hero-title">從第一行程式，<br><em>到真正理解 Rust。</em></h1>
-        <p>循序學習 Rust 的語法、記憶體與並行原理。用可執行的範例、精準的技術圖解，以及動手練習建立理解。</p>
+        <p>不必有程式設計經驗。從電腦如何執行第一行程式開始，跟著範例弄懂資料如何保存、程式為何出錯，再一步步寫出自己的工具。</p>
         <div class="hero-actions">${cta(first.path,'開始學習','data-start')}<a class="button hero-secondary" href="#learning-path">${icon('route', 18)} 課程路線</a></div>
         <div class="hero-meta"><span>${icon('book', 16)} ${chapters.length} 章課程</span><span>${icon('layers', 16)} ${resources.length} 份延伸教材</span></div>
       </div>
@@ -91,7 +91,7 @@ export function makeSite(base) {
     </section>
     <section class="progress-card" data-progress aria-labelledby="progress-title">
       <span class="progress-icon">${icon('target', 24)}</span>
-      <div class="progress-copy"><h2 id="progress-title">我的學習進度</h2><p data-progress-description>完成章節自我驗收後，可將進度儲存在這個瀏覽器。</p></div>
+      <div class="progress-copy"><h2 id="progress-title">我的學習進度</h2><p data-progress-description>讀完教材並試做練習後，可以在這裡記下學習進度。</p></div>
       <div class="progress-meter"><div><span data-progress-count>0 / ${chapters.length} 章</span><strong data-progress-percent>0%</strong></div><progress value="0" max="${chapters.length}" aria-label="課程完成進度"></progress></div>
       <a class="button outline resume-button" href="${url(first.path)}" data-resume>前往第 1 章</a>
     </section>
@@ -142,7 +142,7 @@ export function makeSite(base) {
         <details class="mobile-toc"><summary>${icon('list',17)} 本章目錄</summary><nav aria-label="本章目錄（手機）">${outline}</nav></details>
         <div class="prose">${extra}${outlineLinks}${isOwnership ? ownershipLab() : ''}${firstPart}${flow}${rest}</div>
         ${quiz(entry.slug)}
-        ${isChapter ? `<section class="completion" aria-labelledby="complete-title"><div><h2 id="complete-title">完成本章</h2><p data-completion-status role="status">完成練習與自我驗收後，記錄你的閱讀進度。</p></div><button type="button" class="button outline" id="complete" aria-pressed="false" hidden>${icon('check',17)} <span>標記完成</span></button></section>` : ''}
+        ${isChapter ? `<section class="completion" aria-labelledby="complete-title"><div><h2 id="complete-title">完成本章</h2><p data-completion-status role="status">試著用自己的話說明本章重點，再記下閱讀進度。</p></div><button type="button" class="button outline" id="complete" aria-pressed="false" hidden>${icon('check',17)} <span>標記完成</span></button></section>` : ''}
         <p class="source-link">教材來源 <a href="${sourceURL}">Google Drive 原始文件</a></p>
         ${isChapter ? `<nav class="chapter-pagination" aria-label="相鄰章節">
         ${previous ? `<a href="${url(previous.path)}"><small>上一章</small><strong>${previous.title}</strong></a>` : `<a href="${url('guide')}"><small>開始之前</small><strong>學習指南</strong></a>`}

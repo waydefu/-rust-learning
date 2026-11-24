@@ -31,7 +31,7 @@ fn fence(line: &str) -> Option<(u8, usize, &str)> {
 fn inspect(source: &str) -> Result<usize, Vec<String>> {
     let lines: Vec<_> = source.lines().collect();
     let mut active_fence: Option<(u8, usize)> = None;
-    let mut kinds = HashSet::new();
+    let mut count = 0;
     let mut titles = HashSet::new();
     let mut errors = Vec::new();
     for (i, line) in lines.iter().enumerate() {
@@ -68,8 +68,8 @@ fn inspect(source: &str) -> Result<usize, Vec<String>> {
         }
         if !KINDS.contains(&kind) {
             errors.push(format!("第 {} 行：未知分類 {kind}", i + 1));
-        } else if !kinds.insert(kind) {
-            errors.push(format!("第 {} 行：重複分類 {kind}", i + 1));
+        } else {
+            count += 1;
         }
         if lines.get(i + 1).copied() != Some(">")
             || !lines.get(i + 2).and_then(|line| line.strip_prefix("> "))
@@ -78,12 +78,10 @@ fn inspect(source: &str) -> Result<usize, Vec<String>> {
             errors.push(format!("第 {} 行：教學方塊缺少正文", i + 1));
         }
     }
-    for kind in KINDS {
-        if !kinds.contains(kind) {
-            errors.push(format!("缺少教學方塊 {kind}"));
-        }
+    if count == 0 {
+        errors.push("至少需要一個教學方塊".into());
     }
-    if errors.is_empty() { Ok(kinds.len()) } else { Err(errors) }
+    if errors.is_empty() { Ok(count) } else { Err(errors) }
 }
 
 fn check_file(path: &Path) -> Result<usize, Vec<String>> {
@@ -137,8 +135,14 @@ mod tests {
     #[test]
     fn rejects_editorial_titles_and_duplicates() {
         assert!(inspect(&valid().replace("問題 0？", "來龍去脈")).is_err());
-        assert!(inspect(&valid().replace("callout:analogy", "callout:context")).is_err());
+        assert!(inspect(&valid().replace("callout:analogy", "callout:unknown")).is_err());
         assert!(inspect(&valid().replace("問題 1？", "問題 0？")).is_err());
+    }
+
+    #[test]
+    fn permits_flexible_note_counts_and_repeated_kinds() {
+        assert_eq!(inspect(&valid().replace("callout:analogy", "callout:context")), Ok(5));
+        assert_eq!(inspect("> **一個具體問題？** <!-- callout:context -->\n>\n> 解釋。\n"), Ok(1));
     }
 
     #[test]
