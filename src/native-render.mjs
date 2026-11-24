@@ -220,14 +220,19 @@ export function applyNativeHighlighting(lessons) {
   const output = invoke('highlight-v1',tokens.length,fields);
   if(output.length!==tokens.length*2) throw new Error('Rust 程式區塊回傳數量不一致');
   let native=0;
+  const byLanguage=new Map();
   const blocks=tokens.map((token,i)=>{
+    const language=token.info.split(/\s+/)[0];
+    const stats=byLanguage.get(language)??{native:0,total:0};
+    stats.total++;byLanguage.set(language,stats);
     const original=md.renderer.rules.fence([token],0);
     const [candidate,wrapped]=output.slice(i*2,i*2+2);
     if(wrapped!==original) throw new Error('Rust 程式區塊外框不相容：'+token.info);
-    if(candidate===original){native++;return candidate;}
+    if(candidate===original){native++;stats.native++;return candidate;}
     return wrapped;
   });
   console.log('Rust 高亮逐字相容：'+native+'/'+tokens.length+'；其餘保留原高亮，全部使用 Rust 程式區塊外框');
+  console.log('Rust 高亮各語言：'+[...byLanguage].map(([lang,{native,total}])=>lang+' '+native+'/'+total).join('；'));
   return {blocks,native,total:tokens.length};
 }
 
