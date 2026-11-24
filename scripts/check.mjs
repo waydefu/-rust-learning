@@ -66,11 +66,14 @@ for (const entry of chapters) {
   if (!page) continue;
   const notes = page.nodes.filter(node => attrs(node)['data-callout']);
   const kinds = notes.map(node => attrs(node)['data-callout']);
-  if (notes.length < Object.keys(calloutTypes).length || Object.values(calloutTypes).some(kind => !kinds.includes(kind))) {
+  if (notes.length !== calloutTypes.length || calloutTypes.some(kind => kinds.filter(item => item === kind).length !== 1)) {
     errors.push(`${route} 缺少五種教學方塊`);
   }
   for (const note of notes) {
-    if (attrs(note).role !== 'note' || ![...elements(note)].some(node => attrs(node).class === 'callout-title')) {
+    const title = [...elements(note)].find(node => attrs(node).class === 'callout-title');
+    const textOf = node => node?.nodeName === '#text' ? node.value : (node?.childNodes ?? []).map(textOf).join('');
+    const titleText = textOf(title).trim();
+    if (attrs(note).role !== 'note' || !titleText || /callout:|^(來龍去脈|生活比喻|程式拆解|常見陷阱|動手驗收)$/.test(titleText)) {
       errors.push(`${route} 教學方塊缺少文字標題或語意`);
     }
   }

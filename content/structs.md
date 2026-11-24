@@ -1,6 +1,6 @@
 # 第05章｜從散亂資料到一致的結構
 
-> **來龍去脈**
+> **三個角色，九個值，如何不弄混？** <!-- callout:context -->
 >
 > 遊戲有三名角色，每人都有姓名、血量、等級。如果只把九個值散放在各處，很容易把甲的血量拿去更新乙。結構體（struct）把屬於同一個物件的資料組成一份有名字的紀錄。
 
@@ -21,9 +21,13 @@ fn main() {
 }
 ```
 
-> **生活比喻**
+> **角色卡和真正的角色資料** <!-- callout:analogy -->
 >
 > 像一張角色卡：每個欄位有名稱與型別，`name` 放文字、`hp` 放血量、`level` 放等級。struct 定義卡片格式，實例（instance）是填好資料的某一張卡。結構體是資料型別，不要求一定配置在堆積。
+
+> **從 Player 型別建立一名角色** <!-- callout:walkthrough -->
+>
+> `struct Player` 定義欄位，`Player { ... }` 建立一個角色，`let mut p` 允許修改它，`p.hp = 80` 用點號找到血量欄位並更新。`impl Player` 則把相關方法寫在一起；`self` 表示正在操作的這個角色。
 
 ## 二、為何要有欄位與可變性
 
@@ -31,17 +35,9 @@ struct 是型別藍圖，Player { ... } 是值。整個變數必須宣告 mut �
 
 欄位初始化簡寫：若區域變數也叫 name，可以寫 Player { name, hp: 100, level: 1 }。結構更新語法 Player { hp: 90, ..old } 可能把舊值的非 Copy 欄位移動到新值，使 old 部分不能再用；這是第4章規則的直接延伸。
 
-> **程式拆解**
->
-> `struct Player` 定義欄位，`Player { ... }` 建立一個角色，`let mut p` 允許修改它，`p.hp = 80` 用點號找到血量欄位並更新。`impl Player` 則把相關方法寫在一起；`self` 表示正在操作的這個角色。
-
 ## 三、Tuple struct、單元 struct
 
 struct Color(u8, u8, u8); 看似 tuple，但 Color 是不同於其他同形 tuple 的專屬型別，適合表示不該混用的概念。struct Marker; 是零欄位的單元型別，可用於型別層級標記。
-
-> **常見陷阱**
->
-> `&self` 只借用角色，`&mut self` 允許獨占修改，`self` 依值接收角色，非 Copy 時通常移動所有權。選哪個不是語法喜好，而是方法需要什麼權限。
 
 ## 四、讓資料有行為：impl
 
@@ -69,6 +65,10 @@ impl 把與型別相關的函式組織在一起；fn area(&self) 是方法，借
 
 &self 只讀借用；&mut self 獨占可變借用；self 按值接收並可能消耗原物件。選擇取決於是否需要所有權，而不是單純看函式名稱。
 
+> **方法需要哪一種使用權？** <!-- callout:warning -->
+>
+> `&self` 只借用角色，`&mut self` 允許獨占修改，`self` 依值接收角色，非 Copy 時通常移動所有權。選哪個不是語法喜好，而是方法需要什麼權限。
+
 ## 六、Debug、派生與封裝
 
 ```rust fragment
@@ -82,10 +82,6 @@ println!("{p:?}");
 
 使用 mod 與 pub 控制封裝會在第7章學到。struct 不會自動保證 hp 不超過上限；要建立不變條件，通常透過私有欄位與建構函式檢查。
 
-> **動手驗收**
->
-> 建立兩個 Player，只將其中一個的 hp 降低。再寫一個接收 `&self` 的查詢方法和一個接收 `&mut self` 的扣血方法，解釋為什麼兩者不能互換。
-
 ## 七、常見錯誤／答案
 
 錯誤：println!("{p}") 無法印出自訂 struct；它沒有 Display。改 Debug + {:?} 或自己實作 Display。
@@ -95,5 +91,9 @@ println!("{p:?}");
 練習：設計 Monster { name, hp, attack }，新增 fn hit(&mut self, damage:u32)，使用 saturating_sub 避免無號減法溢位。
 
 驗收：能區分型別、值、欄位、方法、關聯函式、接收 self 的三種方式，以及 struct update 導致的部分移動。
+
+> **替兩名角色分別管理血量** <!-- callout:practice -->
+>
+> 建立兩個 Player，只將其中一個的 hp 降低。再寫一個接收 `&self` 的查詢方法和一個接收 `&mut self` 的扣血方法，解釋為什麼兩者不能互換。
 
 參考：<https://doc.rust-lang.org/stable/book/ch05-00-structs.html>

@@ -28,15 +28,9 @@ export const escape = value => String(value).replace(/[&<>"']/g, character => ({
 
 export const md = new MarkdownIt({ html: false, linkify: false });
 
-// A normal Markdown blockquote with a standalone bold teaching label becomes
-// a note. Ordinary quotes keep their original semantics and appearance.
-export const calloutTypes = Object.freeze({
-  '來龍去脈': 'context',
-  '生活比喻': 'analogy',
-  '程式拆解': 'walkthrough',
-  '常見陷阱': 'warning',
-  '動手驗收': 'practice',
-});
+// The internal kind selects a color, not the reader-facing heading.
+// The HTML comment is parsed as text (raw HTML stays disabled), then removed.
+export const calloutTypes = Object.freeze(['context', 'analogy', 'walkthrough', 'warning', 'practice']);
 md.core.ruler.after('inline', 'lesson_callouts', state => {
   const tokens = state.tokens;
   for (let i = 0; i < tokens.length; i++) {
@@ -44,11 +38,14 @@ md.core.ruler.after('inline', 'lesson_callouts', state => {
     if (open.type !== 'blockquote_open' || tokens[i + 1]?.type !== 'paragraph_open') continue;
     const label = tokens[i + 2];
     if (label?.type !== 'inline' || tokens[i + 3]?.type !== 'paragraph_close') continue;
-    const match = /^\*\*([^*]+)\*\*$/.exec(label.content.trim());
-    const type = match && Object.hasOwn(calloutTypes, match[1]) ? calloutTypes[match[1]] : null;
+    const match = /^\*\*([^*]+)\*\*\s+<!-- callout:([a-z]+) -->$/.exec(label.content.trim());
+    const type = match && calloutTypes.includes(match[2]) ? match[2] : null;
     if (!type) continue;
     const close = tokens.findIndex((token, j) => j > i && token.type === 'blockquote_close' && token.level === open.level);
     if (close === -1 || close <= i + 4) continue;
+    label.content = '**' + match[1] + '**';
+    label.children = [];
+    state.md.inline.parse(label.content, state.md, state.env, label.children);
     open.tag = 'div';
     tokens[close].tag = 'div';
     open.attrSet('class', 'lesson-callout callout-' + type);
