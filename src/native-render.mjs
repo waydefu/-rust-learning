@@ -214,7 +214,8 @@ export function applyNativeReaders(base, specs, lessons) {
 }
 
 export function applyNativeHighlighting(lessons) {
-  const tokens = lessons.flatMap(lesson => lesson.tokens.filter(token => token.type === 'fence'));
+  const locations = lessons.flatMap(lesson => lesson.tokens.filter(token => token.type === 'fence').map(token=>({slug:lesson.entry.slug,token})));
+  const tokens = locations.map(item=>item.token);
   const fields = [icon('copy',16)];
   for (const token of tokens) fields.push(token.info.trim(),token.content,highlightCode(token));
   const output = invoke('highlight-v1',tokens.length,fields);
@@ -229,6 +230,9 @@ export function applyNativeHighlighting(lessons) {
     const [candidate,wrapped]=output.slice(i*2,i*2+2);
     if(wrapped!==original) throw new Error('Rust 程式區塊外框不相容：'+token.info);
     if(candidate===original){native++;stats.native++;return candidate;}
+    const j=[...candidate].findIndex((c,k)=>c!==[...original][k]);
+    const at=j<0?Math.min(candidate.length,original.length):j;
+    console.log('Rust 高亮差異 '+locations[i].slug+':'+(token.map[0]+1)+' '+token.info+' '+JSON.stringify({code:token.content,candidate:candidate.slice(Math.max(0,at-60),at+180),reference:original.slice(Math.max(0,at-60),at+180)}));
     return wrapped;
   });
   console.log('Rust 高亮逐字相容：'+native+'/'+tokens.length+'；其餘保留原高亮，全部使用 Rust 程式區塊外框');
