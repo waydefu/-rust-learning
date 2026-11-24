@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { parseFragment } from 'parse5';
-import { md, projectRoot, renderTokens, resources, stages } from './course.mjs';
+import { md, projectRoot, renderTokens, chapters, resources, stages } from './course.mjs';
 import { icon } from './icons.mjs';
 import { isDeepStrictEqual } from 'node:util';
 
@@ -163,4 +163,27 @@ export function applyNativeNavigation(base, specs) {
     specs[i].navigation = result[i];
   }
   console.log('Rust 導覽逐字比對：' + specs.length + ' 頁通過');
+}
+
+export function applyNativeLanding(base, specs) {
+  const fields = [base, icon('chevron',14), icon('route',18), icon('book',16),
+    icon('layers',16), icon('target',24), icon('list',17), icon('check',15), icon('chevron',15),
+    chapters[0].path, String(chapters.length), String(resources.length)];
+  for (const entry of resources) fields.push(entry.id, entry.path, entry.title, entry.description);
+  fields.push(String(stages.length));
+  for (const stage of stages) {
+    fields.push(stage.id, stage.title, stage.description, icon(stage.icon,22), String(stage.chapters.length));
+    for (const entry of stage.chapters) {
+      fields.push(entry.id, entry.path, entry.title, entry.description, String(entry.slug === 'ownership'));
+    }
+  }
+  const result = invoke('landing-v1', 2, fields);
+  if (result.length !== 2 || specs[0].current !== '' || specs[1].current !== 'resources') {
+    throw new Error('Rust 首頁與延伸資源回傳格式不一致');
+  }
+  for (let i=0; i<2; i++) {
+    if (result[i] !== specs[i].body) throw new Error('Rust 首頁模板與原版不一致：' + specs[i].current);
+    specs[i].body = result[i];
+  }
+  console.log('Rust 首頁與延伸資源模板逐字比對：2 頁通過');
 }

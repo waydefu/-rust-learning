@@ -5,6 +5,7 @@ use std::{collections::HashMap, io::{self, Read, Write}, process::ExitCode};
 
 mod metadata;
 mod navigation;
+mod landing;
 
 type Result<T> = std::result::Result<T, String>;
 const LIMIT: u64 = 64 * 1024 * 1024;
@@ -206,6 +207,7 @@ fn process(input: &str) -> Result<Vec<u8>> {
         "metadata-v1" => metadata::process_metadata(n, &mut fields, &mut result)?,
         "anchors-v1" => metadata::process_anchors(n, &mut fields, &mut result)?,
         "navigation-v1" => navigation::process_navigation(n, &mut fields, &mut result)?,
+        "landing-v1" => landing::process_landing(n, &mut fields, &mut result)?,
         "markdown-v1" => {
             for _ in 0..n {
                 let source = field(&mut fields)?;

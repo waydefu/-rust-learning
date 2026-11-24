@@ -18,8 +18,8 @@
 | 共用 HTML 文件模板 | 已合併 | 34 頁逐字對照 |
 | Markdown 正文 | 31/31 已驗證、已部署 | CI 強制 31/31，禁止回退 |
 | 靜態產物寫入 | 已驗證、已部署 | rust-anything record/replay 與完整產物逐位元組對照 |
-| 章節標題元資料、Unicode 錨點 | Rust 實作待本輪 CI | 31 篇逐項比對、Unicode 邊界案例；catalog 讀取與搜尋全文尚在 JS |
-| 導覽、首頁、互動教材模板 | 側欄導覽 Rust 實作待 CI；首頁及互動模板尚未移植 | 34 頁 DOM 與瀏覽器測試 |
+| 章節標題元資料、Unicode 錨點 | 已驗證、已部署 | 31 篇逐項比對、Unicode 邊界案例；catalog 讀取與搜尋全文尚在 JS |
+| 導覽、首頁、互動教材模板 | 側欄導覽已部署；首頁與資源頁 Rust 實作待 CI；互動模板尚未移植 | 34 頁 DOM 與瀏覽器測試 |
 | 語法高亮、範例抽取、網站檢查 | 未移植 | fenced code、診斷、測試與輸出契約 |
 | Rust CLI 總入口 | 未移植 | 完整 build/check/dev 行為錄製與重播 |
 
@@ -45,4 +45,8 @@ Rust 直接從 Markdown 抽出 H1 及各節標題，以 Unicode NFKC、完整小
 
 Rust 生成 34 頁桌面與手機共用的課程側欄，逐字比對舊版導覽，再由 Rust 文件模板放入頁面。原 JS 模板暫留驗證；所有路由、學習進度、CSS 和瀏覽器腳本不變。現有 rust-anything 寫入器重播仍在 CI 中，本輪新增單元使用原版直接差異驗證，未聲稱已完成 rust-anything 全應用程式 lift。
 
-本輪實作、測試均待 CI；尚未合併、發布。
+PR #10 已合併；PR #11 拆分 Pages 產物上傳與部署 job，main `3d983a3` 的 [Actions](https://github.com/waydefu/-rust-learning/actions/runs/45379517169) 首次執行即成功，含線上版本檢查。
+
+## 第六階段：首頁、章節卡片與延伸資源
+
+Rust 原生模板產生首頁與延伸資源索引的正文、章節卡片、階段區塊及頁尾。Node 傳遞 catalog 欄位與既有可信 SVG 圖示，Rust 驗證路徑、ID、章節數量並跳脫文字；逐字比對兩頁正文與原 JS 模板，然後仍比對完整 34 頁。保留既有 CSS、JS、進度資料、網址及教材。不增加 Cargo 依賴。本輪新增兩個原生測試，待 CI；尚未合併、部署。互動教材、語法高亮及剩餘驗證工具仍待移植。
