@@ -88,3 +88,7 @@ PR #12 已合併，main a51017e 的 Actions #40 首次發布成功。此 PR #13 
 - `rust run` 可用自然程式註解 `// 預期輸出: 文字` 宣告確定性輸出，依序比對完整執行輸出（含換行，CRLF 正規化）；無註解仍只檢查結束狀態。不要用於亂數、耗時或互動輸出。
 - 範例暫存工作目錄不是安全沙箱；只執行受信任的教材，勿在具有私密憑證的環境執行未審查 PR。
 - 分支保護、已合併分支清理與實機測試需由維護者核准或提供相應環境。不要因移植完成就刪除仍用於驗收的 Node 基準。
+
+### 品質稽核基線與修正
+
+PR #14 首輪 [Actions](https://github.com/waydefu/-rust-learning/actions/runs/45397395188) 的功能與跨瀏覽器驗證成功；非阻擋品質 Job 日誌指出 Rustfmt 差異、六項 Clippy 診斷，以及 RUSTSEC-2026-0433、RUSTSEC-2026-0414、RUSTSEC-2026-0592。依該版 rustfmt diff 整理原始碼並修正診斷；pulldown-cmark 升為 0.13.6、url 升為 2.5.9，依 crates.io index 更新鎖定版本與校驗值，仍須以新的 locked build、原版對照及 RustSec 驗證為準。fxhash 的 RUSTSEC-2025-0057 為無修補版本的維護性警告，經 selectors/scraper 傳遞引入；後續評估替代版本與最低 Rust 版本相容性，不隱藏警告。

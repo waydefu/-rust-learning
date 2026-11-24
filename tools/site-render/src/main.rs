@@ -1,23 +1,31 @@
 //! Native static rendering, highlighting, document templates and verification.
 //! The production CLI reads course data natively; Node is a test oracle only.
-use pulldown_cmark::{html, CodeBlockKind, CowStr, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
-use std::{collections::HashMap, io::{self, Read, Write}, process::ExitCode};
+use pulldown_cmark::{
+    CodeBlockKind, CowStr, Event, HeadingLevel, Options, Parser, Tag, TagEnd, html,
+};
+use std::{
+    collections::HashMap,
+    io::{self, Read, Write},
+    process::ExitCode,
+};
 
-mod metadata;
-mod navigation;
-mod landing;
-mod reader;
-mod page_data;
-mod highlight;
-mod fences;
 mod examples;
-mod site_check;
+mod fences;
+mod highlight;
+mod landing;
+mod metadata;
 mod native;
+mod navigation;
+mod page_data;
+mod reader;
+mod site_check;
 
 type Result<T> = std::result::Result<T, String>;
 const LIMIT: u64 = 64 * 1024 * 1024;
 const KINDS: [&str; 5] = ["context", "analogy", "walkthrough", "warning", "practice"];
-const ICONS: [&str; 7] = ["menu", "search19", "sun", "moon", "github", "close", "search"];
+const ICONS: [&str; 7] = [
+    "menu", "search19", "sun", "moon", "github", "close", "search",
+];
 const SITE: &str = "Rust 學習工坊";
 const TEMPLATE: &str = include_str!("../templates/layout.html");
 
@@ -25,8 +33,15 @@ fn escape(value: &str) -> String {
     let mut result = String::new();
     for c in value.chars() {
         result.push_str(match c {
-            '&' => "&amp;", '<' => "&lt;", '>' => "&gt;", '"' => "&quot;", '\'' => "&#39;",
-            _ => { result.push(c); continue; }
+            '&' => "&amp;",
+            '<' => "&lt;",
+            '>' => "&gt;",
+            '"' => "&quot;",
+            '\'' => "&#39;",
+            _ => {
+                result.push(c);
+                continue;
+            }
         });
     }
     result
@@ -37,43 +52,74 @@ fn field<'a>(fields: &mut impl Iterator<Item = &'a str>) -> Result<&'a str> {
 }
 
 fn count<'a>(fields: &mut impl Iterator<Item = &'a str>, max: usize) -> Result<usize> {
-    field(fields)?.parse::<usize>().ok().filter(|n| *n <= max)
+    field(fields)?
+        .parse::<usize>()
+        .ok()
+        .filter(|n| *n <= max)
         .ok_or_else(|| "渲染資料數量無效".into())
 }
 
-struct Heading<'a> { level: u8, id: &'a str }
-struct Fence<'a> { info: &'a str, code: &'a str, rendered: &'a str }
+struct Heading<'a> {
+    level: u8,
+    id: &'a str,
+}
+struct Fence<'a> {
+    info: &'a str,
+    code: &'a str,
+    rendered: &'a str,
+}
 
 fn safe_url(url: &str) -> bool {
     let trimmed = url.trim();
-    if trimmed.chars().any(|c| c.is_control()) { return false; }
+    if trimmed.chars().any(|c| c.is_control()) {
+        return false;
+    }
     let prefix = trimmed.split(['/', '?', '#']).next().unwrap_or("");
     match prefix.split_once(':') {
-        Some((scheme, _)) => matches!(scheme.to_ascii_lowercase().as_str(), "http" | "https" | "mailto" | "ftp"),
+        Some((scheme, _)) => matches!(
+            scheme.to_ascii_lowercase().as_str(),
+            "http" | "https" | "mailto" | "ftp"
+        ),
         None => true,
     }
 }
 
-fn raw<'a>(value: String) -> Event<'a> { Event::Html(CowStr::from(value)) }
+fn raw<'a>(value: String) -> Event<'a> {
+    Event::Html(CowStr::from(value))
+}
 
 fn callout<'a>(events: &[Event<'a>], start: usize) -> Option<(usize, usize, &'a str)> {
     if !matches!(events.get(start + 1), Some(Event::Start(Tag::Paragraph)))
-        || !matches!(events.get(start + 2), Some(Event::Start(Tag::Strong))) {
+        || !matches!(events.get(start + 2), Some(Event::Start(Tag::Strong)))
+    {
         return None;
     }
-    let end = (start + 3..events.len()).find(|&i| matches!(events[i], Event::End(TagEnd::Paragraph)))?;
+    let end =
+        (start + 3..events.len()).find(|&i| matches!(events[i], Event::End(TagEnd::Paragraph)))?;
     let marker = end.checked_sub(1)?;
-    let Event::InlineHtml(comment) = events.get(marker)? else { return None; };
-    let kind = comment.strip_prefix("<!-- callout:")?.strip_suffix(" -->")?;
+    let Event::InlineHtml(comment) = events.get(marker)? else {
+        return None;
+    };
+    let kind = comment
+        .strip_prefix("<!-- callout:")?
+        .strip_suffix(" -->")?;
     let kind = KINDS.into_iter().find(|value| *value == kind)?;
-    let strong_end = (start + 3..marker).find(|&i| matches!(events[i], Event::End(TagEnd::Strong)))?;
-    if !events[strong_end + 1..marker].iter().all(|e| matches!(e, Event::Text(t) if t.trim().is_empty())) {
+    let strong_end =
+        (start + 3..marker).find(|&i| matches!(events[i], Event::End(TagEnd::Strong)))?;
+    if !events[strong_end + 1..marker]
+        .iter()
+        .all(|e| matches!(e, Event::Text(t) if t.trim().is_empty()))
+    {
         return None;
     }
     Some((strong_end, end, kind))
 }
 
-fn markdown(source: &str, headings: &[Heading<'_>], fences: &[Fence<'_>]) -> Result<(String, String)> {
+fn markdown(
+    source: &str,
+    headings: &[Heading<'_>],
+    fences: &[Fence<'_>],
+) -> Result<(String, String)> {
     let options = Options::ENABLE_TABLES | Options::ENABLE_STRIKETHROUGH;
     let events: Vec<_> = Parser::new_ext(source, options).collect();
     // Validate the full stream before any special handling (including titles and callouts).
@@ -81,10 +127,18 @@ fn markdown(source: &str, headings: &[Heading<'_>], fences: &[Fence<'_>]) -> Res
         Event::Start(Tag::Link { dest_url, .. } | Tag::Image { dest_url, .. }) if !safe_url(dest_url))) {
         return Err("拒絕不安全的 Markdown 網址".into());
     }
-    if !matches!(events.first(), Some(Event::Start(Tag::Heading { level: HeadingLevel::H1, .. }))) {
+    if !matches!(
+        events.first(),
+        Some(Event::Start(Tag::Heading {
+            level: HeadingLevel::H1,
+            ..
+        }))
+    ) {
         return Err("教材必須以 H1 開頭".into());
     }
-    let end_title = events.iter().position(|e| matches!(e, Event::End(TagEnd::Heading(HeadingLevel::H1))))
+    let end_title = events
+        .iter()
+        .position(|e| matches!(e, Event::End(TagEnd::Heading(HeadingLevel::H1))))
         .ok_or("找不到教材標題結尾")?;
     let mut i = end_title + 1;
     let mut out = Vec::new();
@@ -96,13 +150,20 @@ fn markdown(source: &str, headings: &[Heading<'_>], fences: &[Fence<'_>]) -> Res
         match &events[i] {
             Event::Start(Tag::Heading { level, .. }) => {
                 if heading_index == 0 {
-                    if !quotes.is_empty() { return Err("第一節標題位於引用內".into()); }
+                    if !quotes.is_empty() {
+                        return Err("第一節標題位於引用內".into());
+                    }
                     html::push_html(&mut intro, out.drain(..));
                 }
                 let expected = headings.get(heading_index).ok_or("Rust 找到額外標題")?;
                 let level = *level as u8;
-                if level != expected.level || level == 1 { return Err("Rust 標題層級不相容".into()); }
-                out.push(raw(format!("<h{level} id=\"{}\" tabindex=\"-1\">", escape(expected.id))));
+                if level != expected.level || level == 1 {
+                    return Err("Rust 標題層級不相容".into());
+                }
+                out.push(raw(format!(
+                    "<h{level} id=\"{}\" tabindex=\"-1\">",
+                    escape(expected.id)
+                )));
                 heading_index += 1;
             }
             Event::End(TagEnd::Heading(level)) => {
@@ -133,7 +194,7 @@ fn markdown(source: &str, headings: &[Heading<'_>], fences: &[Fence<'_>]) -> Res
                 if let Some((strong_end, end, kind)) = callout(&events, i) {
                     quotes.push(true);
                     out.push(raw(format!("<div class=\"lesson-callout callout-{kind}\" data-callout=\"{kind}\" role=\"note\">\n<p class=\"callout-title\">")));
-                    out.extend(events[i+2..=strong_end].iter().cloned().map(|e| match e {
+                    out.extend(events[i + 2..=strong_end].iter().cloned().map(|e| match e {
                         Event::Html(t) | Event::InlineHtml(t) => Event::Text(t),
                         other => other,
                     }));
@@ -147,9 +208,13 @@ fn markdown(source: &str, headings: &[Heading<'_>], fences: &[Fence<'_>]) -> Res
             Event::End(TagEnd::BlockQuote(_)) => {
                 if quotes.pop().ok_or("引用區塊不完整")? {
                     out.push(raw("</div>\n".into()));
-                } else { out.push(events[i].clone()); }
+                } else {
+                    out.push(events[i].clone());
+                }
             }
-            Event::Start(Tag::Link { dest_url, .. } | Tag::Image { dest_url, .. }) if !safe_url(dest_url) => {
+            Event::Start(Tag::Link { dest_url, .. } | Tag::Image { dest_url, .. })
+                if !safe_url(dest_url) =>
+            {
                 return Err("拒絕不安全的 Markdown 網址".into());
             }
             // Never pass arbitrary HTML from the Markdown source through as markup.
@@ -175,41 +240,80 @@ fn render_template(template: &str, values: &HashMap<&str, String>) -> Result<Str
     while let Some((before, after)) = rest.split_once("{{") {
         result.push_str(before);
         let (key, remaining) = after.split_once("}}").ok_or("模板欄位未關閉")?;
-        result.push_str(values.get(key).ok_or_else(|| format!("未知模板欄位 {key}"))?);
+        result.push_str(
+            values
+                .get(key)
+                .ok_or_else(|| format!("未知模板欄位 {key}"))?,
+        );
         rest = remaining;
     }
     result.push_str(rest);
     Ok(result)
 }
 
-fn layout(base: &str, title: &str, description: &str, navigation: &str, body: &str,
-          data: &str, icons: &[&str]) -> Result<String> {
-    if !base.starts_with('/') || !base.ends_with('/') || base.starts_with("//")
-        || !base.bytes().all(|c| c.is_ascii_alphanumeric() || b"/_.-".contains(&c))
-        || base.split('/').any(|s| matches!(s, "." | "..")) || data.contains('<') || icons.len() != ICONS.len() {
+fn layout(
+    base: &str,
+    title: &str,
+    description: &str,
+    navigation: &str,
+    body: &str,
+    data: &str,
+    icons: &[&str],
+) -> Result<String> {
+    if !base.starts_with('/')
+        || !base.ends_with('/')
+        || base.starts_with("//")
+        || !base
+            .bytes()
+            .all(|c| c.is_ascii_alphanumeric() || b"/_.-".contains(&c))
+        || base.split('/').any(|s| matches!(s, "." | ".."))
+        || data.contains('<')
+        || icons.len() != ICONS.len()
+    {
         return Err("頁面模板輸入無效".into());
     }
-    let title = if title == SITE { title.to_owned() } else { format!("{title}｜{SITE}") };
+    let title = if title == SITE {
+        title.to_owned()
+    } else {
+        format!("{title}｜{SITE}")
+    };
     let mut values = HashMap::from([
-        ("title", escape(&title)), ("description", escape(description)), ("base", escape(base)),
-        ("favicon", format!("{base}assets/favicon.svg")), ("theme", format!("{base}assets/theme.js")),
-        ("stylesheet", format!("{base}assets/site.css")), ("app", format!("{base}assets/app.js")),
-        ("siteName", SITE.to_owned()), ("repository", "https://github.com/waydefu/-rust-learning".to_owned()),
-        ("navigation", navigation.to_owned()), ("body", body.to_owned()), ("pageData", data.to_owned()),
+        ("title", escape(&title)),
+        ("description", escape(description)),
+        ("base", escape(base)),
+        ("favicon", format!("{base}assets/favicon.svg")),
+        ("theme", format!("{base}assets/theme.js")),
+        ("stylesheet", format!("{base}assets/site.css")),
+        ("app", format!("{base}assets/app.js")),
+        ("siteName", SITE.to_owned()),
+        (
+            "repository",
+            "https://github.com/waydefu/-rust-learning".to_owned(),
+        ),
+        ("navigation", navigation.to_owned()),
+        ("body", body.to_owned()),
+        ("pageData", data.to_owned()),
     ]);
-    for (key, value) in ICONS.into_iter().zip(icons) { values.insert(key, (*value).to_owned()); }
+    for (key, value) in ICONS.into_iter().zip(icons) {
+        values.insert(key, (*value).to_owned());
+    }
     render_template(TEMPLATE, &values)
 }
 
 fn emit(out: &mut Vec<u8>, value: &str) -> Result<()> {
-    if value.contains('\0') { return Err("輸出欄位包含 NUL".into()); }
+    if value.contains('\0') {
+        return Err("輸出欄位包含 NUL".into());
+    }
     out.extend_from_slice(value.as_bytes());
     out.push(0);
     Ok(())
 }
 
 fn process(input: &str) -> Result<Vec<u8>> {
-    let mut fields = input.strip_suffix('\0').ok_or("渲染資料缺少結尾")?.split('\0');
+    let mut fields = input
+        .strip_suffix('\0')
+        .ok_or("渲染資料缺少結尾")?
+        .split('\0');
     let mode = field(&mut fields)?;
     let n = count(&mut fields, 1000)?;
     let mut result = Vec::new();
@@ -231,50 +335,84 @@ fn process(input: &str) -> Result<Vec<u8>> {
                 let source = field(&mut fields)?;
                 let mut headings = Vec::new();
                 for _ in 0..count(&mut fields, 5000)? {
-                    headings.push(Heading { level: count(&mut fields, 6)? as u8, id: field(&mut fields)? });
+                    headings.push(Heading {
+                        level: count(&mut fields, 6)? as u8,
+                        id: field(&mut fields)?,
+                    });
                 }
                 let mut fences = Vec::new();
                 for _ in 0..count(&mut fields, 5000)? {
-                    fences.push(Fence { info: field(&mut fields)?, code: field(&mut fields)?, rendered: field(&mut fields)? });
+                    fences.push(Fence {
+                        info: field(&mut fields)?,
+                        code: field(&mut fields)?,
+                        rendered: field(&mut fields)?,
+                    });
                 }
                 match markdown(source, &headings, &fences) {
-                    Ok((intro, rest)) => { emit(&mut result, "ok")?; emit(&mut result, &intro)?; emit(&mut result, &rest)?; }
-                    Err(error) => { emit(&mut result, "error")?; emit(&mut result, &error)?; emit(&mut result, "")?; }
+                    Ok((intro, rest)) => {
+                        emit(&mut result, "ok")?;
+                        emit(&mut result, &intro)?;
+                        emit(&mut result, &rest)?;
+                    }
+                    Err(error) => {
+                        emit(&mut result, "error")?;
+                        emit(&mut result, &error)?;
+                        emit(&mut result, "")?;
+                    }
                 }
             }
         }
         "layout-v1" => {
             let base = field(&mut fields)?;
-            let icons = (0..ICONS.len()).map(|_| field(&mut fields)).collect::<Result<Vec<_>>>()?;
+            let icons = (0..ICONS.len())
+                .map(|_| field(&mut fields))
+                .collect::<Result<Vec<_>>>()?;
             for _ in 0..n {
                 let title = field(&mut fields)?;
                 let description = field(&mut fields)?;
                 let navigation = field(&mut fields)?;
                 let body = field(&mut fields)?;
                 let data = field(&mut fields)?;
-                emit(&mut result, &layout(base, title, description, navigation, body, data, &icons)?)?;
+                emit(
+                    &mut result,
+                    &layout(base, title, description, navigation, body, data, &icons)?,
+                )?;
             }
         }
         _ => return Err("未知渲染介面版本".into()),
     }
-    if fields.next().is_some() { return Err("渲染資料包含多餘欄位".into()); }
+    if fields.next().is_some() {
+        return Err("渲染資料包含多餘欄位".into());
+    }
     Ok(result)
 }
 
 fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let mut input = String::new();
-    io::stdin().lock().take(LIMIT + 1).read_to_string(&mut input)?;
-    if input.len() as u64 > LIMIT { return Err("渲染資料超過 64 MiB".into()); }
+    io::stdin()
+        .lock()
+        .take(LIMIT + 1)
+        .read_to_string(&mut input)?;
+    if input.len() as u64 > LIMIT {
+        return Err("渲染資料超過 64 MiB".into());
+    }
     io::stdout().lock().write_all(&process(&input)?)?;
     Ok(())
 }
 
 fn main() -> ExitCode {
-    let args:Vec<String>=std::env::args().skip(1).collect();
-    let result=if args.is_empty(){run().map_err(|e|e.to_string())}else{native::run(&args)};
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let result = if args.is_empty() {
+        run().map_err(|e| e.to_string())
+    } else {
+        native::run(&args)
+    };
     match result {
         Ok(()) => ExitCode::SUCCESS,
-        Err(error) => { eprintln!("site-render: {error}"); ExitCode::FAILURE }
+        Err(error) => {
+            eprintln!("site-render: {error}");
+            ExitCode::FAILURE
+        }
     }
 }
 
@@ -285,8 +423,19 @@ mod tests {
     #[test]
     fn renders_chinese_callouts_headings_and_fenced_code() {
         let source = "# 教材\n\n> **為什麼？** <!-- callout:context -->\n>\n> 說明。\n\n## 原理\n\n~~~rust run\nlet a = 1;\n~~~\n";
-        let (intro, rest) = markdown(source, &[Heading { level: 2, id: "s-原理" }],
-            &[Fence { info: "rust run", code: "let a = 1;\n", rendered: "<pre><code>let a = 1;\n</code></pre>" }]).unwrap();
+        let (intro, rest) = markdown(
+            source,
+            &[Heading {
+                level: 2,
+                id: "s-原理",
+            }],
+            &[Fence {
+                info: "rust run",
+                code: "let a = 1;\n",
+                rendered: "<pre><code>let a = 1;\n</code></pre>",
+            }],
+        )
+        .unwrap();
         assert!(intro.contains("data-callout=\"context\""));
         assert!(intro.contains("<strong>為什麼？</strong>"));
         assert!(!intro.contains("<!-- callout:"));
@@ -300,9 +449,23 @@ mod tests {
         assert!(rest.contains("&lt;script&gt;"));
         assert!(!rest.contains("<script>"));
         assert!(markdown("# 教材\n\n[x](javascript:alert)\n", &[], &[]).is_err());
-        assert!(markdown("# 教材\n\n> **[x](javascript:alert)** <!-- callout:context -->\n>\n> 說明。\n", &[], &[]).is_err());
+        assert!(
+            markdown(
+                "# 教材\n\n> **[x](javascript:alert)** <!-- callout:context -->\n>\n> 說明。\n",
+                &[],
+                &[]
+            )
+            .is_err()
+        );
         assert!(markdown("# [x](javascript:alert)\n\n說明。\n", &[], &[]).is_err());
-        assert!(markdown("# 教材\n\n> **[x](https://example.com)** <!-- callout:context -->\n>\n> 說明。\n", &[], &[]).is_ok());
+        assert!(
+            markdown(
+                "# 教材\n\n> **[x](https://example.com)** <!-- callout:context -->\n>\n> 說明。\n",
+                &[],
+                &[]
+            )
+            .is_ok()
+        );
     }
 
     #[test]
@@ -316,7 +479,16 @@ mod tests {
     #[test]
     fn layout_preserves_title_and_rejects_script_data() {
         let icons = [""; 7];
-        let result = layout("/course/", "<標題>", "描述", "<nav></nav>", "<h1>教材</h1>", "{}", &icons).unwrap();
+        let result = layout(
+            "/course/",
+            "<標題>",
+            "描述",
+            "<nav></nav>",
+            "<h1>教材</h1>",
+            "{}",
+            &icons,
+        )
+        .unwrap();
         assert!(result.contains("<title>&lt;標題&gt;｜Rust 學習工坊</title>"));
         assert!(result.contains("/course/assets/site.css"));
         assert!(layout("/", SITE, "", "", "", "</script>", &icons).is_err());
