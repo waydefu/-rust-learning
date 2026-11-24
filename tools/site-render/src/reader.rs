@@ -1,7 +1,5 @@
 //! Native reader and interactive templates. Trusted Markdown fragments are supplied by the bridge.
 use super::{Result, escape, render_template};
-#[cfg(feature = "migration-compat")]
-use super::{count, emit, field};
 use std::collections::HashMap;
 fn fill(t: &str, v: &[(&str, &str)]) -> Result<String> {
     render_template(
@@ -10,14 +8,6 @@ fn fill(t: &str, v: &[(&str, &str)]) -> Result<String> {
             .map(|(k, v)| (*k, (*v).to_owned()))
             .collect::<HashMap<_, _>>(),
     )
-}
-#[cfg(feature = "migration-compat")]
-fn flag<'a>(f: &mut impl Iterator<Item = &'a str>) -> Result<bool> {
-    match field(f)? {
-        "true" => Ok(true),
-        "false" => Ok(false),
-        _ => Err("互動旗標無效".into()),
-    }
 }
 fn safe(s: &str) -> bool {
     !s.is_empty()
@@ -29,23 +19,6 @@ pub(super) struct Quiz<'a> {
     pub explanation: &'a str,
     pub choices: Vec<&'a str>,
     pub answer: usize,
-}
-#[cfg(feature = "migration-compat")]
-fn read_quiz<'a>(f: &mut impl Iterator<Item = &'a str>) -> Result<Option<Quiz<'a>>> {
-    if !flag(f)? {
-        return Ok(None);
-    }
-    let prompt = field(f)?;
-    let explanation = field(f)?;
-    let n = count(f, 100)?;
-    let answer = count(f, 100)?;
-    let choices = (0..n).map(|_| field(f)).collect::<Result<Vec<_>>>()?;
-    Ok(Some(Quiz {
-        prompt,
-        explanation,
-        choices,
-        answer,
-    }))
 }
 fn quiz(data: Option<&Quiz<'_>>, slug: &str, icon: &str) -> Result<String> {
     let Some(data) = data else {
@@ -84,19 +57,6 @@ pub(super) struct Flow<'a> {
     pub caption: &'a str,
     pub nodes: Vec<&'a str>,
 }
-#[cfg(feature = "migration-compat")]
-fn read_flow<'a>(f: &mut impl Iterator<Item = &'a str>) -> Result<Option<Flow<'a>>> {
-    if !flag(f)? {
-        return Ok(None);
-    }
-    Ok(Some(Flow {
-        title: field(f)?,
-        caption: field(f)?,
-        nodes: (0..count(f, 100)?)
-            .map(|_| field(f))
-            .collect::<Result<Vec<_>>>()?,
-    }))
-}
 fn flow(data: Option<&Flow<'_>>, icon: &str) -> Result<String> {
     let Some(data) = data else {
         return Ok(String::new());
@@ -117,18 +77,6 @@ fn flow(data: Option<&Flow<'_>>, icon: &str) -> Result<String> {
     )
 }
 type Ownership<'a> = [(&'a str, &'a str); 4];
-#[cfg(feature = "migration-compat")]
-fn read_ownership<'a>(f: &mut impl Iterator<Item = &'a str>) -> Result<Option<Ownership<'a>>> {
-    if !flag(f)? {
-        return Ok(None);
-    }
-    Ok(Some([
-        (field(f)?, field(f)?),
-        (field(f)?, field(f)?),
-        (field(f)?, field(f)?),
-        (field(f)?, field(f)?),
-    ]))
-}
 fn ownership(data: Option<&Ownership<'_>>, icon: &str) -> Result<String> {
     let Some(data) = data else {
         return Ok(String::new());
@@ -244,83 +192,6 @@ fn outline(toc: &[(&str, &str)], chapter: bool, ownership: bool) -> String {
     out
 }
 
-#[cfg(feature = "migration-compat")]
-pub(super) fn process_reader<'a>(
-    n: usize,
-    f: &mut impl Iterator<Item = &'a str>,
-    out: &mut Vec<String>,
-) -> Result<()> {
-    let base = field(f)?;
-    if !base.starts_with('/')
-        || !base.ends_with('/')
-        || base.starts_with("//")
-        || !base
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b"/_.-".contains(&b))
-        || base.split('/').any(|s| matches!(s, "." | ".."))
-    {
-        return Err("閱讀頁網址無效".into());
-    }
-    let [chevron, list, check, target, layers, flow_icon] = [
-        field(f)?,
-        field(f)?,
-        field(f)?,
-        field(f)?,
-        field(f)?,
-        field(f)?,
-    ];
-    let mut stages = Vec::new();
-    for _ in 0..count(f, 100)? {
-        let title = field(f)?;
-        let mut chapters = Vec::new();
-        for _ in 0..count(f, 1000)? {
-            chapters.push(Chapter {
-                id: field(f)?,
-                path: field(f)?,
-                title: field(f)?,
-            });
-        }
-        stages.push(Stage { title, chapters });
-    }
-    let mut lessons = Vec::new();
-    for _ in 0..n {
-        let slug = field(f)?;
-        let kind = match (flag(f)?, flag(f)?) {
-            (true, false) => LessonKind::Chapter,
-            (false, true) => LessonKind::Resource,
-            (false, false) => LessonKind::Guide,
-            _ => return Err("教材分類無效".into()),
-        };
-        lessons.push(Lesson {
-            slug,
-            kind,
-            id: field(f)?,
-            entry_title: field(f)?,
-            title: field(f)?,
-            description: field(f)?,
-            stage_title: field(f)?,
-            label_icon: field(f)?,
-            source_id: field(f)?,
-            intro: field(f)?,
-            rest: field(f)?,
-            toc: (0..count(f, 5000)?)
-                .map(|_| Ok((field(f)?, field(f)?)))
-                .collect::<Result<Vec<_>>>()?,
-            ownership: read_ownership(f)?,
-            flow: read_flow(f)?,
-            quiz: read_quiz(f)?,
-        });
-    }
-    for html in render(
-        base,
-        [chevron, list, check, target, layers, flow_icon],
-        &stages,
-        &lessons,
-    )? {
-        emit(out, &html)?;
-    }
-    Ok(())
-}
 
 pub(super) fn render(
     base: &str,

@@ -1,7 +1,5 @@
 //! Native landing pages; the old JavaScript templates are the exact-output oracle.
 use super::{Result, escape, render_template};
-#[cfg(feature = "migration-compat")]
-use super::{count, emit, field};
 use std::collections::{HashMap, HashSet};
 
 const HOME: &str = include_str!("../templates/home.html");
@@ -55,17 +53,6 @@ pub(super) struct Landing<'a> {
     pub stages: Vec<Stage<'a>>,
 }
 
-#[cfg(feature = "migration-compat")]
-fn read_entry<'a>(fields: &mut impl Iterator<Item = &'a str>, resource: bool) -> Result<Entry<'a>> {
-    let entry = Entry {
-        id: field(fields)?,
-        path: field(fields)?,
-        title: field(fields)?,
-        description: field(fields)?,
-    };
-    validate_entry(&entry, resource)?;
-    Ok(entry)
-}
 
 fn validate_entry(entry: &Entry<'_>, resource: bool) -> Result<()> {
     let digits = if resource {
@@ -111,77 +98,6 @@ fn card(
     )
 }
 
-#[cfg(feature = "migration-compat")]
-pub(super) fn process_landing<'a>(
-    n: usize,
-    fields: &mut impl Iterator<Item = &'a str>,
-    out: &mut Vec<String>,
-) -> Result<()> {
-    if n != 3 {
-        return Err("首頁渲染必須包含兩頁".into());
-    }
-    let base = field(fields)?;
-    if base != "/"
-        && (!base.starts_with('/') || !base.ends_with('/') || !safe_path(&base[1..base.len() - 1]))
-    {
-        return Err("首頁基礎網址無效".into());
-    }
-    let [chevron14, route, book, layers, target, list, check, chevron] = [
-        field(fields)?,
-        field(fields)?,
-        field(fields)?,
-        field(fields)?,
-        field(fields)?,
-        field(fields)?,
-        field(fields)?,
-        field(fields)?,
-    ];
-    let first = field(fields)?;
-    if !safe_path(first) {
-        return Err("起始章節網址無效".into());
-    }
-    let chapter_count = count(fields, 1000)?;
-    let resource_count = count(fields, 1000)?;
-    let resources = (0..resource_count)
-        .map(|_| read_entry(fields, true))
-        .collect::<Result<Vec<_>>>()?;
-    let mut stages = Vec::new();
-    for _ in 0..count(fields, 100)? {
-        let id = field(fields)?;
-        let title = field(fields)?;
-        let description = field(fields)?;
-        let icon = field(fields)?.to_owned();
-        let mut chapters = Vec::new();
-        for _ in 0..count(fields, 1000)? {
-            let e = read_entry(fields, false)?;
-            let featured = match field(fields)? {
-                "true" => true,
-                "false" => false,
-                _ => return Err("卡片旗標無效".into()),
-            };
-            chapters.push((e, featured));
-        }
-        stages.push(Stage {
-            id,
-            title,
-            description,
-            icon,
-            chapters,
-        });
-    }
-    let input = Landing {
-        base,
-        icons: [chevron14, route, book, layers, target, list, check, chevron],
-        first,
-        chapter_count,
-        resources,
-        stages,
-    };
-    for html in render(&input)? {
-        emit(out, &html)?;
-    }
-    Ok(())
-}
 
 pub(super) fn render(input: &Landing<'_>) -> Result<Vec<String>> {
     let base = input.base;
@@ -316,46 +232,37 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "migration-compat")]
     #[test]
     fn renders_landing_and_checks_counts() {
-        let fields = [
-            "/course/",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "chapters/start",
-            "1",
-            "1",
-            "A01",
-            "resources/extra",
-            "延伸",
-            "說明",
-            "1",
-            "fundamentals",
-            "入門",
-            "介紹",
-            "",
-            "1",
-            "01",
-            "chapters/start",
-            "開始",
-            "內容",
-            "false",
-        ];
-        let mut output = Vec::new();
-        process_landing(3, &mut fields.into_iter(), &mut output).unwrap();
-        let html = output.join("\0");
+        let mut input = Landing {
+            base: "/course/",
+            icons: [""; 8],
+            first: "chapters/start",
+            chapter_count: 1,
+            resources: vec![Entry {
+                id: "A01",
+                path: "resources/extra",
+                title: "延伸",
+                description: "說明",
+            }],
+            stages: vec![Stage {
+                id: "fundamentals",
+                title: "入門",
+                description: "介紹",
+                icon: String::new(),
+                chapters: vec![(Entry {
+                    id: "01",
+                    path: "chapters/start",
+                    title: "開始",
+                    description: "內容",
+                }, false)],
+            }],
+        };
+        let html = render(&input).unwrap().join("\n");
         assert!(html.contains("data-start"));
         assert!(html.contains("第 1–1 章"));
         assert!(html.contains("/course/resources/extra/"));
-        let mut invalid = fields;
-        invalid[10] = "2";
-        assert!(process_landing(3, &mut invalid.into_iter(), &mut Vec::new()).is_err());
+        input.chapter_count = 2;
+        assert!(render(&input).is_err());
     }
 }

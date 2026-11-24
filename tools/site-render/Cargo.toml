@@ -5,10 +5,6 @@ edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 
-[features]
-default = []
-migration-compat = []
-
 [dependencies]
 lesson-check = { path = "../lesson-check" }
 site-tools = { path = "../site-tools" }

@@ -1,25 +1,11 @@
 //! Site verification over normalized HTML and URL facts from the HTML5 parser.
 //! The native collector and the historical adapter share one typed verifier.
 use super::Result;
-#[cfg(feature = "migration-compat")]
-use super::{count, emit, field};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
     path::{Component, Path},
 };
-#[cfg(feature = "migration-compat")]
-fn flag<'a>(f: &mut impl Iterator<Item = &'a str>) -> Result<bool> {
-    match field(f)? {
-        "true" => Ok(true),
-        "false" => Ok(false),
-        _ => Err("網站驗證旗標無效".into()),
-    }
-}
-#[cfg(feature = "migration-compat")]
-fn strings<'a>(f: &mut impl Iterator<Item = &'a str>, limit: usize) -> Result<Vec<&'a str>> {
-    (0..count(f, limit)?).map(|_| field(f)).collect()
-}
 fn unique<T: Ord>(values: &[T]) -> bool {
     values.iter().collect::<BTreeSet<_>>().len() == values.len()
 }
@@ -116,131 +102,7 @@ pub(super) struct IndexEntry<'a> {
     pub text: &'a str,
     pub headings: Vec<(&'a str, &'a str)>,
 }
-#[cfg(feature = "migration-compat")]
-fn read_index<'a>(f: &mut impl Iterator<Item = &'a str>) -> Result<Vec<IndexEntry<'a>>> {
-    let mut entries = Vec::new();
-    for _ in 0..count(f, 1000)? {
-        let [title, id, description, href, text] =
-            [field(f)?, field(f)?, field(f)?, field(f)?, field(f)?];
-        let mut headings = Vec::new();
-        for _ in 0..count(f, 5000)? {
-            headings.push((field(f)?, field(f)?));
-        }
-        entries.push(IndexEntry {
-            title,
-            id,
-            description,
-            href,
-            text,
-            headings,
-        });
-    }
-    Ok(entries)
-}
 
-#[cfg(feature = "migration-compat")]
-pub(super) fn process_site_check<'a>(
-    n: usize,
-    f: &mut impl Iterator<Item = &'a str>,
-    out: &mut Vec<String>,
-) -> Result<()> {
-    let base = field(f)?;
-    if !base.starts_with('/')
-        || !base.ends_with('/')
-        || base.starts_with("//")
-        || !base
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b"/_.-".contains(&b))
-        || base.split('/').any(|p| matches!(p, "." | ".."))
-    {
-        return Err("BASE_PATH 無效".into());
-    }
-    let mut lessons = Vec::new();
-    for _ in 0..count(f, 1000)? {
-        lessons.push(Lesson {
-            id: field(f)?,
-            slug: field(f)?,
-            path: field(f)?,
-            chapter: flag(f)?,
-            resource: flag(f)?,
-            stage_count: count(f, 100)?,
-            source_id: field(f)?,
-            source_valid: flag(f)?,
-            headings: (0..count(f, 5000)?)
-                .map(|_| Ok((count(f, 6)?, field(f)?)))
-                .collect::<Result<Vec<_>>>()?,
-            fences: (0..count(f, 5000)?)
-                .map(|_| Ok((count(f, 1_000_000)?, field(f)?, field(f)?)))
-                .collect::<Result<Vec<_>>>()?,
-            notes: strings(f, 5000)?,
-        });
-    }
-    let mut pages = Vec::new();
-    for _ in 0..n {
-        let route = field(f)?.to_owned();
-        let h1 = count(f, 5000)?;
-        let main = count(f, 5000)?;
-        let lang = field(f)?.to_owned();
-        let missing_alt = count(f, 5000)?;
-        let ids = strings(f, 20_000)?.into_iter().map(str::to_owned).collect();
-        let mut notes = Vec::new();
-        for _ in 0..count(f, 5000)? {
-            notes.push(Note {
-                kind: field(f)?.to_owned(),
-                role: field(f)?.to_owned(),
-                title: field(f)?.to_owned(),
-            });
-        }
-        let mut links = Vec::new();
-        for _ in 0..count(f, 20_000)? {
-            links.push(Link {
-                address: field(f)?.to_owned(),
-                path: field(f)?.to_owned(),
-                hash: field(f)?.to_owned(),
-            });
-        }
-        pages.push(Page {
-            route,
-            h1,
-            main,
-            lang,
-            missing_alt,
-            ids,
-            notes,
-            links,
-        });
-    }
-    let report = RenderReport {
-        layout: field(f)?,
-        pages: count(f, 1000)?,
-        markdown: (0..count(f, 1000)?)
-            .map(|_| Ok((field(f)?, field(f)?)))
-            .collect::<Result<Vec<_>>>()?,
-        renderer: field(f)?,
-        native: count(f, 100_000)?,
-        total: count(f, 100_000)?,
-        fallback: count(f, 100_000)?,
-    };
-    let input = Input {
-        base,
-        lessons,
-        pages,
-        report,
-        shape_valid: flag(f)?,
-        expected_index: read_index(f)?,
-        index: read_index(f)?,
-    };
-    let summary = verify(&input)?;
-    for value in [
-        summary.lessons as u64,
-        summary.pages as u64,
-        summary.links as u64,
-        summary.bytes,
-    ] {
-        emit(out, &value.to_string())?;
-    }
-    Ok(())
-}
 
 pub(super) fn verify(input: &Input<'_>) -> Result<Summary> {
     let base = input.base;

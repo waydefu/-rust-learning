@@ -1,8 +1,6 @@
 //! Execute trusted, checked-in Rust lesson examples in a temporary working directory.
 //! This is not an OS sandbox; never run unreviewed snippets with local credentials.
 use super::Result;
-#[cfg(feature = "migration-compat")]
-use super::{count, emit, field};
 use std::{
     collections::{BTreeMap, BTreeSet},
     env, fs, io,
@@ -440,43 +438,6 @@ pub(super) struct Report {
     pub messages: Vec<String>,
 }
 
-#[cfg(feature = "migration-compat")]
-pub(super) fn process_examples<'a>(
-    n: usize,
-    f: &mut impl Iterator<Item = &'a str>,
-    out: &mut Vec<String>,
-) -> Result<()> {
-    // Parse the entire packet before running any command.
-    let mut lessons = Vec::new();
-    for _ in 0..n {
-        let slug = field(f)?;
-        let mut tokens = Vec::new();
-        for _ in 0..count(f, 5000)? {
-            tokens.push(Example {
-                line: count(f, 1_000_000)?,
-                info: field(f)?,
-                source: field(f)?,
-            });
-        }
-        lessons.push(Lesson {
-            slug,
-            examples: tokens,
-        });
-    }
-    if f.next().is_some() {
-        return Err("範例資料包含多餘欄位".into());
-    }
-    let report = check(&lessons)?;
-    emit(out, &report.version)?;
-    for value in [report.compiled, report.run, report.error, report.project] {
-        emit(out, &value.to_string())?;
-    }
-    emit(out, &report.messages.len().to_string())?;
-    for message in report.messages {
-        emit(out, &message)?;
-    }
-    Ok(())
-}
 
 pub(super) fn check(lessons: &[Lesson<'_>]) -> Result<Report> {
     let root = Scratch::new()?;

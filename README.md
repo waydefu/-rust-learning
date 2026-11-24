@@ -4,7 +4,7 @@
 
 ## 本機使用
 
-建置網站只需要 Cargo 及 Rust 1.85.1（由 rust-toolchain.toml 指定）。正式建置、檢查、教材範例與本機預覽均由 Rust CLI 提供，不需要 Node.js、npm 或 node_modules。Node.js 24 只用於測試。舊版對照程式從固定歷史提交抽取到暫存目錄，不再維護在目前原始碼樹。一般閱讀只需瀏覽器。
+建置網站只需要 Cargo 及 Rust 1.85.1（由 rust-toolchain.toml 指定）。正式建置、檢查、教材範例與本機預覽均由 Rust CLI 提供，不需要 Node.js、npm 或 node_modules。Node.js 24 只用於測試。舊版 Node 建置器與遷移協定均已退役，原生測試使用已核准的固定產物雜湊。一般閱讀只需瀏覽器。
 
 ```sh
 cargo run --locked --manifest-path tools/site-render/Cargo.toml -- dev
@@ -27,15 +27,13 @@ npm run test:browser
 
 `dist/` 是靜態輸出。以本機或其他網域根目錄提供時用預設 `BASE_PATH=/`。驗證 GitHub 專案路徑時可設 `BASE_PATH=/-rust-learning/`。GitHub Actions 會讀取 Pages 的實際子路徑。Playwright 的預設測試攔截測試網域的請求，從 Pages 產物回應。也可設定 `TEST_ORIGIN` 指向已啟動的伺服器，該伺服器需用同一 Pages 子路徑。
 
-## 渲染相容性
+## 原生渲染與驗收
 
-正式 Rust CLI 直接讀取 catalog、site-data.json 和 Markdown，原生生成全部網站產物。CI 使用固定歷史版本比對根路徑及 Pages 子路徑的完整網站樹，另有獨立原生重建與負例驗證；任何未經確認的差異均阻止部署。成功的 `dist/build-render-report.json` 記錄各篇正文及各語言原生生成數量，沒有回退到 Node 的路徑。
+正式 CLI 以具名 Rust 型別讀取 catalog、site-data.json、Markdown、搜尋索引與渲染報告，直接呼叫教材檢查、搜尋索引、網站寫入及 HTTP 預覽函式庫。三個工具共享 Cargo Workspace 與鎖檔；正式路徑不含 Node、歷史 NUL 協定或子 Cargo 建置器。教材外部依賴專案仍獨立。
 
-## Rust 移植驗證
+CI 驗證根路徑與 Pages 子路徑完整網站樹的逐檔 SHA-256，基準來自已完成舊版對照與 rust-anything 重播的成功 CI，而非目前建置結果。另驗證建置可重現、拒絕無效路徑/內容/JSON schema、網站檢查負例及失敗保留舊產物。基準來源及有意更新方式見 [tests/fixtures/README.md](tests/fixtures/README.md)，歷史遷移證據見 [移植紀錄](docs/rust-port.md)。不再下載或執行歷史 Node 實作。
 
-建置器直接呼叫 Rust 函式庫的 `site_write::write_site` 建立網站輸出、複製資源並替換 `dist`；Node 原版寫入器及建置器留在固定歷史 Git 提交，只在暫存目錄中作測試對照。CI 會逐位元組比較完整網站輸出，並使用固定版本的 rust-anything v4.0.0 對獨立寫入器及完整 CLI（build/check/check-rust/dev、失敗保留產物）執行錄製及重播。Linux x86_64 可執行 `bash scripts/regression/verify-reference.sh`（對照使用已提交的 HEAD）；它只在暫存目錄下載經 SHA-256 驗證的工具，不變更 Agent 設定或教材工具鏈。詳見 [移植紀錄](docs/rust-port.md)。
-
-另有獨立 CI job 在沒有 node_modules 且阻擋 node/npm/npx 的 PATH 下執行 build、check、check-rust，Pages 發布也直接使用 Rust CLI。舊版只透過歷史 Git 提交提供測試對照。
+`dist/build-render-report.json` 記錄原生正文及高亮統計，無 Node 回退。無 Node 的獨立 CI 驗證建置和檢查，所有可執行教材另在隔離容器驗證。
 
 ## 專案位置
 
@@ -44,7 +42,7 @@ npm run test:browser
 | [content/](content/) | 教材 Markdown、章節路徑與來源索引 |
 | [src/](src/) | 樣式和瀏覽器互動 |
 | [content/site-data.json](content/site-data.json) | 共用課程階段、SVG 圖示、互動圖解與測驗資料 |
-| [scripts/](scripts/) | 產生靜態頁面、檢查內容與 Rust 範例 |
+| [scripts/](scripts/) | 原生回歸與容器隔離驗收 |
 | [tools/lesson-check/](tools/lesson-check/) | Rust 原生教材建置前檢查器 |
 | [tools/site-tools/](tools/site-tools/) | Rust 原生搜尋索引、網站產物寫入與本機 HTTP 預覽 |
 | [tools/site-render/](tools/site-render/) | Rust CommonMark、高亮、全站模板、互動資料、範例執行器與網站驗證 |
@@ -71,20 +69,8 @@ GitHub 目前可查到名稱含前導連字號的 [waydefu/-rust-learning](https
 
 瀏覽器入口 `src/assets/app.js` 僅負責初始化；`modules/` 分別管理共用資料、導覽搜尋、學習進度、閱讀互動、動效及概念實驗室。`site.css` 保留基礎設計及教材排版，`motion.css` 和 `concept-labs.css` 管理對應功能。所有入口與 modulepreload 由 HTML 宣告，維持原有靜態資源驗證與大小預算。
 
-Rust 工具統一使用 `tools/Cargo.toml` workspace、`tools/Cargo.lock` 與 `tools/target/`；教材的外部依賴範例維持獨立 Cargo 專案，避免教學依賴影響網站工具。
+### 教材執行與隔離
 
-正式 CLI 直接呼叫 `lesson_check`、`site_tools::search_index`、`site_tools::site_write`、`site_tools::site_preview` 函式庫；原本獨立工具的 CLI 保留作相容入口及行為重播，正式建置不再啟動子 Cargo 程序。渲染內部欄位直接傳入迭代器，只有舊版相容 stdin 介面需要 NUL 封包。
+所有 `rust run` 範例須宣告 stdout 契約（`// 預期輸出: 文字` 或 `// 預期無輸出`）。執行器分離 stdout/stderr，限制輸出、逾時及繼承環境變數，Unix 逾時終止程序群組。本機直接 `check-rust` 仍只適用可信任教材。
 
-教材執行器分離 stdout/stderr、限制每個輸出檔讀取量為 1 MiB、限制執行時間與子程序環境變數；Unix 逾時時會終止該子程序群組。它仍不是安全沙箱：不能阻止程式讀取檔案、連線或自行脫離程序群組，僅適用於可信任教材。
-
-### 獨立回歸與固定歷史參考
-
-`npm run test:regression` 驗證目前工作樹的 Rust 建置可重現、無效部署路徑拒絕並保留整棵產物、以及網站檢查器的八個負例。`scripts/regression/verify-reference.sh` 僅在 CI 或手動驗收時使用 Git 固定提交 `b2c5abe32610f6f098e46ec2501c9514fed2066d` 的舊 Node 參考程式，搭配目前 HEAD 的 Rust 工具、教材及資產；保留原有逐位元組與 rust-anything 重播證據。不要在現行原始碼重新加入另一套渲染器。若預期改變 HTML 契約，須以獨立回歸基準明確審核差異，而非靜默放寬比較。
-
-正式網站渲染以具名型別傳遞導覽、首頁、教材分類、流程、測驗、所有權步驟及頁面資料，HTML 外框直接呼叫模板函式；教材執行器直接回傳具名統計。歷史欄位介面仍由相容 adapter 解析，以固定版本回歸驗證。網站檢查器同樣直接傳入具名 HTML、教材及報告事實並回傳統計；正式 build/check/check-rust/dev 路徑不經過歷史欄位介面。歷史入口集中於 `compat.rs`，只供固定版本回歸及相容 CLI。
-
-### 課程資料與隔離驗證
-
-課程目錄、site-data、搜尋索引及渲染報告使用 `schema.rs` 的 Serde 具名型別，未知欄位及錯誤型別在 JSON 邊界拒絕。歷史 stdin 協定預設不編入 CLI；固定參考測試才啟用 `migration-compat`，正常 build/check/check-rust/dev 不依賴它。
-
-Linux Docker 環境可執行 `bash scripts/regression/check-sandbox.sh`：先在建置階段取得鎖定的 Cargo 依賴，之後在無網路、唯讀根檔案系統、非 root、無 capabilities、有限 CPU/記憶體/PID 及 tmpfs 的容器中執行所有教材範例；無主機目錄掛載。CI 將此獨立驗證列為發布關卡。映像仍信任 Docker 基礎映像、編譯器與 Cargo 套件；不是對敵意程式的絕對安全保證。現有歷史對照與本機 check-rust 仍只適用可信任教材。
+Linux Docker 環境執行 `bash scripts/regression/check-sandbox.sh`，先取得鎖定的依賴，再在無外網、唯讀根檔案系統、非 root、移除 capabilities、限制 CPU/記憶體/PID、僅有 tmpfs 可寫且無主機目錄掛載的容器中驗證全部教材。CI 將此列為發布關卡；仍信任 Docker 基礎映像與編譯器，不是對敵意程式的絕對安全保證。

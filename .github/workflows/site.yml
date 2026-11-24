@@ -18,13 +18,10 @@ jobs:
     name: 教材與網站驗證
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      VERIFY_SITE_WRITE: '1'
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-          fetch-depth: 0
       - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
@@ -33,19 +30,7 @@ jobs:
       - run: npm audit --audit-level=high
       - run: rustup show
       - run: cargo test --locked --workspace --manifest-path tools/Cargo.toml
-      - run: cargo test --locked --workspace --all-features --manifest-path tools/Cargo.toml
-      - name: 固定歷史版本對照與 Rust-anything 行為重播
-        shell: bash
-        run: bash scripts/regression/verify-reference.sh
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: migration-replay
-          path: .migration-evidence/
-          include-hidden-files: true
-          if-no-files-found: ignore
       - run: npm run test:regression
-      - run: cargo run --locked --manifest-path tools/site-render/Cargo.toml -- check-rust
       - run: npx playwright install --with-deps chromium
       - run: npm run test:regression && npm run test:browser
         env:
@@ -53,9 +38,8 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: full-app-evidence
-          path: .migration-evidence/full-app-*.json
-          include-hidden-files: true
+          name: approved-output-evidence
+          path: test-results/regression/
           if-no-files-found: error
       - name: 驗證 Rust 本機預覽伺服器
         env:
@@ -101,7 +85,6 @@ jobs:
           export BASE_PATH=/-rust-learning/
           cargo run --locked --manifest-path tools/site-render/Cargo.toml -- build
           cargo run --locked --manifest-path tools/site-render/Cargo.toml -- check
-          cargo run --locked --manifest-path tools/site-render/Cargo.toml -- check-rust
           test ! -d node_modules
           jq -e '.highlight.native == .highlight.total and .highlight.fallback == 0 and all(.markdown[]; .renderer == "rust")' dist/build-render-report.json
 
@@ -147,7 +130,6 @@ jobs:
         shell: bash
         run: |
           cargo clippy --locked --workspace --manifest-path tools/Cargo.toml --all-targets -- -D warnings
-          cargo clippy --locked --workspace --all-features --manifest-path tools/Cargo.toml --all-targets -- -D warnings
       - name: RustSec 依賴掃描
         shell: bash
         run: |

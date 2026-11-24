@@ -100,28 +100,29 @@ pub(super) struct SearchHeading {
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct RenderReport {
-    pub layout: String,
-    pub pages: usize,
-    pub markdown: Vec<MarkdownReport>,
+    // Preserve the historical canonical JSON key order.
     pub highlight: HighlightReport,
+    pub layout: String,
+    pub markdown: Vec<MarkdownReport>,
+    pub pages: usize,
 }
 
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct MarkdownReport {
-    pub slug: String,
-    pub renderer: String,
     pub reason: String,
+    pub renderer: String,
+    pub slug: String,
 }
 
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub(super) struct HighlightReport {
-    pub renderer: String,
-    pub native: usize,
-    pub total: usize,
-    pub fallback: usize,
     pub by_language: BTreeMap<String, LanguageCount>,
+    pub fallback: usize,
+    pub native: usize,
+    pub renderer: String,
+    pub total: usize,
 }
 
 #[derive(Deserialize, Serialize)]

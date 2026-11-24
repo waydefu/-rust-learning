@@ -1,7 +1,5 @@
 //! Serialize the browser page-data contract without accepting pre-rendered JSON.
 
-#[cfg(feature = "migration-compat")]
-use super::{Result, count, emit, field};
 use std::fmt::Write as _;
 fn string(out: &mut String, s: &str) {
     out.push('"');
@@ -27,14 +25,6 @@ fn property(out: &mut String, key: &str, value: &str) {
     string(out, key);
     out.push(':');
     string(out, value)
-}
-#[cfg(feature = "migration-compat")]
-fn flag<'a>(f: &mut impl Iterator<Item = &'a str>) -> Result<bool> {
-    match field(f)? {
-        "true" => Ok(true),
-        "false" => Ok(false),
-        _ => Err("頁面資料旗標無效".into()),
-    }
 }
 pub(super) struct OwnershipStep<'a> {
     pub code: &'a str,
@@ -104,62 +94,7 @@ pub(super) fn render(base: &str, paths: &[(&str, &str)], data: &PageData<'_>) ->
     page
 }
 
-#[cfg(feature = "migration-compat")]
-fn optional(value: &str) -> Option<&str> {
-    (!value.is_empty()).then_some(value)
-}
 
-#[cfg(feature = "migration-compat")]
-pub(super) fn process_data<'a>(
-    n: usize,
-    f: &mut impl Iterator<Item = &'a str>,
-    out: &mut Vec<String>,
-) -> Result<()> {
-    let base = field(f)?;
-    let paths = (0..count(f, 1000)?)
-        .map(|_| Ok((field(f)?, field(f)?)))
-        .collect::<Result<Vec<_>>>()?;
-    for _ in 0..n {
-        let chapter = optional(field(f)?);
-        let ownership = if flag(f)? {
-            let mut steps = Vec::new();
-            for _ in 0..count(f, 100)? {
-                steps.push(OwnershipStep {
-                    code: field(f)?,
-                    source: field(f)?,
-                    target: field(f)?,
-                    owner: optional(field(f)?),
-                    borrowed: match field(f)? {
-                        "" => None,
-                        "true" => Some(true),
-                        "false" => Some(false),
-                        _ => return Err("借用旗標無效".into()),
-                    },
-                    message: field(f)?,
-                });
-            }
-            Some(steps)
-        } else {
-            None
-        };
-        let answer = optional(field(f)?)
-            .map(|v| v.parse::<usize>().map_err(|_| "測驗索引無效".to_owned()))
-            .transpose()?;
-        emit(
-            out,
-            &render(
-                base,
-                &paths,
-                &PageData {
-                    chapter,
-                    ownership,
-                    answer,
-                },
-            ),
-        )?;
-    }
-    Ok(())
-}
 #[cfg(test)]
 mod tests {
     use super::*;

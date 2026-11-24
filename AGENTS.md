@@ -7,4 +7,4 @@
 - 驗證依變更範圍選擇。在本機執行的指令、Actions 結果、部署結果、線上實測分開記錄。手機裝置測試請標明是實機或瀏覽器模擬。
 - 外部服務安裝或設定、正式公開發布、付費、不可逆刪除與機密處理須取得對應授權。
 
-- 舊版 Node 實作已退役，固定歷史參考僅透過 `scripts/regression/verify-reference.sh` 讀取；不要重新引入雙套渲染或建置邏輯。預期輸出契約變更須附明確差異與回歸證據。
+- 舊 Node 與歷史 stdin 協定已退役。完整產物驗收使用 `tests/fixtures/site-baseline.json.gz` 的已核准逐檔雜湊；不得自動更新基準或重新引入雙套實作。預期輸出變更須附差異與回歸證據；範例隔離驗證使用 `scripts/regression/check-sandbox.sh`。

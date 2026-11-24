@@ -1,8 +1,6 @@
 //! Native candidate highlighting. The bridge only selects exact reference matches.
 //! Rust grammar behavior is compared against highlight.js 11.12.0 (BSD-3-Clause).
 use super::escape;
-#[cfg(feature = "migration-compat")]
-use super::{Result, emit, field};
 
 fn escaped(text: &str) -> String {
     escape(text).replace("&#39;", "&#x27;")
@@ -568,21 +566,6 @@ pub(super) fn block(info: &str, highlighted: &str, icon: &str) -> String {
         "<div class=\"code-block\"><div class=\"code-header\"><span>{name}{note}</span><button type=\"button\" class=\"copy-button\" data-copy hidden>{icon}<span>複製</span></button></div><pre tabindex=\"0\" aria-label=\"{name}程式碼\"><code class=\"language-{}\">{highlighted}</code></pre></div>\n",
         escape(language)
     )
-}
-#[cfg(feature = "migration-compat")]
-pub(super) fn process_highlight<'a>(
-    n: usize,
-    f: &mut impl Iterator<Item = &'a str>,
-    out: &mut Vec<String>,
-) -> Result<()> {
-    let icon = field(f)?;
-    for _ in 0..n {
-        let info = field(f)?;
-        let code = field(f)?;
-        let language = info.split_whitespace().next().unwrap_or("");
-        emit(out, &block(info, &highlight(language, code), icon))?;
-    }
-    Ok(())
 }
 #[cfg(test)]
 mod tests {
