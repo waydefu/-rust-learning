@@ -75,6 +75,7 @@ fn main() {
     println!("{b}");
     // println!("{a}");            // 若取消註解，會觸發 E0382
 }
+// 預期輸出: hello
 ```
 
 逐行讀這個範例：
@@ -92,6 +93,7 @@ fn main() {
 ```rust run
 let a = String::from("hello");
 let b = a.clone(); // 新配置、複製資料，a 與 b 各自擁有
+// 預期無輸出
 ```
 
 ### 用作用域看看誰負責清理
@@ -105,6 +107,8 @@ fn main() {
     }
     println!("內層區塊已結束");
 }
+// 預期輸出: Rust
+// 預期輸出: 內層區塊已結束
 ```
 
 這次有兩組大括號。b 在內層區塊建立，取得原本由 a 持有的 String；內層區塊結束，b 被銷毀，String 的緩衝區被釋放。外層程式仍然可以繼續印出「內層區塊已結束」，但不能再使用已經移動的 a。
@@ -159,6 +163,7 @@ fn main() {
     let n = size(&name);
     println!("{name} {n}");
 }
+// 預期輸出: Rust 4
 ```
 
 把範例拆開來看：`fn size(s: &String) -> usize` 宣告了一個函式，參數 s 是 String 的參考，箭頭後的 usize 是回傳值的型別，常用於長度或索引。`s.len()` 是呼叫 len 方法，取得文字的位元組數。Rust 這四個英文字母各占一個 UTF-8 位元組，所以結果是 4。
@@ -178,6 +183,8 @@ println!("{r}");     // 最後一次使用 r
 let w = &mut name;   // 可變借用，與 r 的有效使用期不重疊
 w.push('!');
 println!("{name}");
+// 預期輸出: R
+// 預期輸出: R!
 ```
 
 依順序追蹤：第一行建立可修改的字串 R；第二行 r 借來讀；第三行印出 R，是 r 的最後一次使用；第四行 w 借來修改；第五行 push 將字元 ! 加到字串尾端；最後印出 R!。這裡沒有兩次衝突的借用同時有效。
@@ -197,6 +204,7 @@ let mut s = String::from("ok");
 let view = &s;
 println!("{view}");
 s.push('!'); // 此時 view 不再被使用
+// 預期輸出: ok
 ```
 
 這段程式印出 ok，然後才把 ! 加上去。即使 view 的名稱到區塊結束前仍在作用域內，編譯器也看得出後面沒有使用 view，因此這次修改合法。
@@ -254,6 +262,7 @@ fn main() {
     let text = String::from("第一行\n第二行");
     assert_eq!(first_line(&text), "第一行");
 }
+// 預期無輸出
 ```
 
 ## 八、String 與 &str 到底差什麼？
@@ -285,6 +294,7 @@ greet("世界");
 fn first_word(s: &str) -> &str {
     s.split_whitespace().next().unwrap_or("")
 }
+// 預期無輸出
 ```
 
 這是按 Unicode 空白分隔的示範；切片以位元組為索引，不能隨意在 UTF-8 字元中間切開，例如 &s[0..1] 對中文字可能在執行時 panic。需要依字元或使用者感知字素處理時應另選 API。
@@ -313,6 +323,7 @@ fn main() {
     a.push('!');
     assert_eq!(a.as_str(), "Rust!");
 }
+// 預期無輸出
 ```
 
 `assert_eq!` 是檢查兩邊是否相等的巨集：不相等就會讓程式 panic（中止正常流程）；相等時不印出任何文字。這裡兩次檢查都會成功。b 最後一次使用是第一個檢查，接著才能透過 a 修改原值。as_str() 取得 String 內容的共享字串切片。

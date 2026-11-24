@@ -21,6 +21,7 @@ let nums = vec![1, 2, 3];
 let mut it = nums.iter();
 assert_eq!(it.next(), Some(&1));
 assert_eq!(it.next(), Some(&2));
+// 預期無輸出
 ```
 
 `Iterator` trait 定義 `Item` 關聯型別及 `next() -> Option<Self::Item>`。Some 表示有下一項，None 表示已結束。每次呼叫 next 才讓進度往前。
@@ -40,6 +41,7 @@ let processed: Vec<i32> = values.iter()
     .map(|&x| x * 10)
     .collect();
 assert_eq!(processed, vec![20, 40]);
+// 預期無輸出
 ```
 
 filter、map 是轉換器（adapter），通常先建立迭代器管線，不會立刻跑完。collect、sum、fold、for 會消費迭代器並推動工作。別因為寫了 map 就以為副作用已發生。
@@ -54,6 +56,7 @@ filter、map 是轉換器（adapter），通常先建立迭代器管線，不會
 let offset = 3;
 let add_offset = |x: i32| x + offset;
 assert_eq!(add_offset(7), 10);
+// 預期無輸出
 ```
 
 閉包可捕獲所在作用域的 offset；普通 fn 函式不會自動捕獲周遭局部變數。編譯器依使用情況決定捕獲方式：不可變借用、可變借用或移動。

@@ -4,8 +4,9 @@ use super::{Result, count, emit, field};
 use std::{
     collections::{BTreeMap, BTreeSet},
     env, fs, io,
+    io::Read,
     path::{Path, PathBuf},
-    process::{Command, Stdio},
+    process::{Child, Command, Stdio},
     thread,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
@@ -36,56 +37,108 @@ impl Drop for Scratch {
         let _ = fs::remove_dir_all(&self.0);
     }
 }
+const MAX_OUTPUT: u64 = 1024 * 1024;
+
 struct Output {
     success: bool,
     code: Option<i32>,
-    text: String,
+    stdout: String,
+    stderr: String,
 }
+
+fn read_output(path: &Path) -> Result<String> {
+    let mut data = Vec::new();
+    fs::File::open(path)
+        .map_err(err)?
+        .take(MAX_OUTPUT + 1)
+        .read_to_end(&mut data)
+        .map_err(err)?;
+    if data.len() as u64 > MAX_OUTPUT {
+        return Err("範例輸出超過 1 MiB 限制".into());
+    }
+    Ok(String::from_utf8_lossy(&data).into_owned())
+}
+
+fn terminate(child: &mut Child) {
+    #[cfg(unix)]
+    if let Ok(pid) = i32::try_from(child.id()) {
+        // SAFETY: the running child was assigned its own process group before
+        // spawn. The negative group ID targets that group, not the caller.
+        if pid > 1 {
+            unsafe { libc::kill(-pid, libc::SIGKILL) };
+        }
+    }
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
 fn command(program: &Path, args: &[&str], cwd: &Path, log: &Path, seconds: u64) -> Result<Output> {
-    let file = fs::File::create(log).map_err(err)?;
-    let mut child = Command::new(program)
+    let stderr_path = log.with_extension("stderr");
+    let mut cmd = Command::new(program);
+    // Keep toolchain and platform basics, not arbitrary CI tokens or secrets.
+    // This is environment hygiene, not an OS filesystem/network sandbox.
+    let allowed = [
+        "PATH", "HOME", "USERPROFILE", "SYSTEMROOT", "WINDIR", "TEMP", "TMP", "TMPDIR",
+        "RUSTUP_HOME", "CARGO_HOME", "CARGO_TARGET_DIR", "RUSTC", "RUSTDOC", "LIB", "LIBPATH",
+        "INCLUDE", "LANG", "LC_ALL", "LC_CTYPE", "TZ", "CC", "CXX", "AR", "RANLIB",
+    ];
+    cmd.env_clear().envs(env::vars_os().filter(|(key, _)| {
+        allowed
+            .iter()
+            .any(|name| key.to_string_lossy().eq_ignore_ascii_case(name))
+    }));
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        cmd.process_group(0);
+    }
+    let mut child = cmd
         .args(args)
         .current_dir(cwd)
         .stdin(Stdio::null())
-        .stdout(Stdio::from(file.try_clone().map_err(err)?))
-        .stderr(Stdio::from(file))
+        .stdout(Stdio::from(fs::File::create(log).map_err(err)?))
+        .stderr(Stdio::from(fs::File::create(&stderr_path).map_err(err)?))
         .spawn()
         .map_err(err)?;
     let start = Instant::now();
     let status = loop {
         match child.try_wait() {
             Ok(Some(status)) => break status,
-            Ok(None) if start.elapsed() < Duration::from_secs(seconds) => {
-                thread::sleep(Duration::from_millis(15))
-            }
             Ok(None) => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return Err(format!("命令逾時：{}", program.display()));
+                let too_large = [log, stderr_path.as_path()]
+                    .iter()
+                    .any(|p| fs::metadata(p).is_ok_and(|m| m.len() > MAX_OUTPUT));
+                if too_large || start.elapsed() >= Duration::from_secs(seconds) {
+                    terminate(&mut child);
+                    return Err(if too_large {
+                        "範例輸出超過 1 MiB 限制".into()
+                    } else {
+                        format!("命令逾時：{}", program.display())
+                    });
+                }
+                thread::sleep(Duration::from_millis(15));
             }
             Err(e) => {
-                let _ = child.kill();
-                let _ = child.wait();
+                terminate(&mut child);
                 return Err(err(e));
             }
         }
     };
-    let data = fs::read(log).map_err(err)?;
     Ok(Output {
         success: status.success(),
         code: status.code(),
-        text: String::from_utf8_lossy(&data).into_owned(),
+        stdout: read_output(log)?,
+        stderr: read_output(&stderr_path)?,
     })
 }
+
 fn success(output: Output) -> Result<()> {
     if output.success {
         Ok(())
+    } else if output.stdout.is_empty() && output.stderr.is_empty() {
+        Err(format!("程式結束狀態 {:?}", output.code))
     } else {
-        Err(if output.text.is_empty() {
-            format!("程式結束狀態 {:?}", output.code)
-        } else {
-            output.text
-        })
+        Err(format!("{}{}", output.stdout, output.stderr))
     }
 }
 fn main_line(source: &str, allow_async: bool) -> bool {
@@ -134,21 +187,21 @@ fn diagnostics(text: &str) -> BTreeSet<String> {
         })
         .collect()
 }
-// Explicit line-by-line output contract for deterministic run examples.
-// No annotation means exit-status validation only. Output uses LF on all platforms.
-fn expected_output(source: &str) -> Option<String> {
-    let lines: Vec<_> = source
-        .lines()
-        .filter_map(|line| {
-            line.trim_start()
-                .strip_prefix("// 預期輸出: ")
-                .map(str::to_owned)
-        })
-        .collect();
-    if lines.is_empty() {
-        None
-    } else {
-        Some(lines.join("\n") + "\n")
+// Every executable run example has an explicit stdout contract.
+fn expected_output(source: &str) -> Result<String> {
+    let mut lines = Vec::new();
+    let mut silent = 0;
+    for line in source.lines().map(str::trim_start) {
+        if let Some(value) = line.strip_prefix("// 預期輸出: ") {
+            lines.push(value);
+        } else if line.trim_end() == "// 預期無輸出" {
+            silent += 1;
+        }
+    }
+    match (lines.is_empty(), silent) {
+        (true, 1) => Ok(String::new()),
+        (false, 0) => Ok(lines.join("\n") + "\n"),
+        _ => Err("rust run 必須宣告唯一的預期輸出契約".into()),
     }
 }
 fn verify_output(expected: &str, actual: &str) -> Result<()> {
@@ -261,9 +314,9 @@ impl Runner {
                 return Err("需指定預期診斷碼".into());
             }
             let result = command(&self.rustc, &flags, &self.root, &self.log, 20)?;
-            let actual = diagnostics(&result.text);
+            let actual = diagnostics(&result.stderr);
             if result.success || result.code.is_none() || expected != actual {
-                return Err(format!("預期 {arg}，實際 {actual:?}\n{}", result.text));
+                return Err(format!("預期 {arg}，實際 {actual:?}\n{}", result.stderr));
             }
             self.stats.error += 1;
             return Ok(());
@@ -286,9 +339,7 @@ impl Runner {
         if matches!(mode, "run" | "test") {
             let output = command(&self.binary, &[], &self.root, &self.log, 20)?;
             if mode == "run" && output.success {
-                if let Some(expected) = expected_output(source) {
-                    verify_output(&expected, &output.text)?;
-                }
+                verify_output(&expected_output(source)?, &output.stdout)?;
             }
             success(output)?;
             self.stats.run += 1;
@@ -389,7 +440,7 @@ pub(super) fn process_examples<'a>(
         stats: Stats::default(),
     };
     let version = command(&runner.rustc, &["--version"], &runner.root, &runner.log, 20)?;
-    let version_text = version.text.trim().to_owned();
+    let version_text = version.stdout.trim().to_owned();
     success(version)?;
     let mut failures = Vec::new();
     for (slug, tokens) in lessons {
@@ -449,14 +500,42 @@ mod tests {
     #[test]
     fn expected_output_contract() {
         assert_eq!(
-            expected_output("// 預期輸出: a\n// 預期輸出: b\n").as_deref(),
-            Some("a\nb\n")
+            expected_output("// 預期輸出: a\n// 預期輸出: b\n").unwrap(),
+            "a\nb\n"
         );
-        assert_eq!(expected_output("let x = 1;"), None);
+        assert!(expected_output("let x = 1;").is_err());
+        assert_eq!(expected_output("// 預期無輸出").unwrap(), "");
+        assert!(expected_output("// 預期無輸出\n// 預期輸出: a").is_err());
         assert!(verify_output("a\n", "a\r\n").is_ok());
         assert!(verify_output("a\n", "b\n").is_err());
         assert!(verify_output("a\n", "a\nextra\n").is_err());
     }
+    #[cfg(unix)]
+    #[test]
+    fn captures_separate_streams_and_limits_output() {
+        let scratch = Scratch::new().unwrap();
+        let log = scratch.0.join("command.log");
+        let output = command(
+            Path::new("/bin/sh"),
+            &["-c", "printf 'ok'; printf 'diagnostic' >&2"],
+            &scratch.0,
+            &log,
+            5,
+        )
+        .unwrap();
+        assert!(output.success);
+        assert_eq!(output.stdout, "ok");
+        assert_eq!(output.stderr, "diagnostic");
+        assert!(command(
+            Path::new("/bin/sh"),
+            &["-c", "head -c 1048577 /dev/zero"],
+            &scratch.0,
+            &log,
+            5,
+        )
+        .is_err());
+    }
+
     #[test]
     fn exact_error_codes() {
         let d = diagnostics(

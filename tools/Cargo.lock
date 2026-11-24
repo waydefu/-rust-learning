@@ -562,6 +562,7 @@ name = "site-render"
 version = "0.1.0"
 dependencies = [
  "lesson-check",
+ "libc",
  "pulldown-cmark",
  "scraper",
  "serde_json",
