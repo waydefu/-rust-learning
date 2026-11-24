@@ -158,10 +158,21 @@ jobs:
           done
           exit "$status"
 
+  sandbox_examples:
+    name: 隔離環境教材驗證
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: 無網路、唯讀、非 root 容器執行
+        run: bash scripts/regression/check-sandbox.sh
+
   build_pages:
     name: 建置與上傳 Pages 產物
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    needs: [verify, native_only, cross_browser, rust_quality]
+    needs: [verify, native_only, cross_browser, rust_quality, sandbox_examples]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

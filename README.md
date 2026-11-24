@@ -82,3 +82,9 @@ Rust 工具統一使用 `tools/Cargo.toml` workspace、`tools/Cargo.lock` 與 `t
 `npm run test:regression` 驗證目前工作樹的 Rust 建置可重現、無效部署路徑拒絕並保留整棵產物、以及網站檢查器的八個負例。`scripts/regression/verify-reference.sh` 僅在 CI 或手動驗收時使用 Git 固定提交 `b2c5abe32610f6f098e46ec2501c9514fed2066d` 的舊 Node 參考程式，搭配目前 HEAD 的 Rust 工具、教材及資產；保留原有逐位元組與 rust-anything 重播證據。不要在現行原始碼重新加入另一套渲染器。若預期改變 HTML 契約，須以獨立回歸基準明確審核差異，而非靜默放寬比較。
 
 正式網站渲染以具名型別傳遞導覽、首頁、教材分類、流程、測驗、所有權步驟及頁面資料，HTML 外框直接呼叫模板函式；教材執行器直接回傳具名統計。歷史欄位介面仍由相容 adapter 解析，以固定版本回歸驗證。網站檢查器同樣直接傳入具名 HTML、教材及報告事實並回傳統計；正式 build/check/check-rust/dev 路徑不經過歷史欄位介面。歷史入口集中於 `compat.rs`，只供固定版本回歸及相容 CLI。
+
+### 課程資料與隔離驗證
+
+課程目錄、site-data、搜尋索引及渲染報告使用 `schema.rs` 的 Serde 具名型別，未知欄位及錯誤型別在 JSON 邊界拒絕。歷史 stdin 協定預設不編入 CLI；固定參考測試才啟用 `migration-compat`，正常 build/check/check-rust/dev 不依賴它。
+
+Linux Docker 環境可執行 `bash scripts/regression/check-sandbox.sh`：先在建置階段取得鎖定的 Cargo 依賴，之後在無網路、唯讀根檔案系統、非 root、無 capabilities、有限 CPU/記憶體/PID 及 tmpfs 的容器中執行所有教材範例；無主機目錄掛載。CI 將此獨立驗證列為發布關卡。映像仍信任 Docker 基礎映像、編譯器與 Cargo 套件；不是對敵意程式的絕對安全保證。現有歷史對照與本機 check-rust 仍只適用可信任教材。
