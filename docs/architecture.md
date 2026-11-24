@@ -2,11 +2,15 @@
 
 ## 靜態網站
 
-Node.js 24 使用 markdown-it 解析 CommonMark，highlight.js 在建置時處理 Rust、Shell 和 TOML。每章輸出各自的 `index.html`，網址可分享、深層連結可重新整理。少量瀏覽器原生 JS 提供搜尋、測驗、複製、主題、互動圖解與本機進度。搜尋索引在有搜尋詞時才下載，包含各章文字、程式碼及標題，支援繁體中文子字串與 Rust 診斷碼。閱讀、章節導覽與展開測驗解析可在關閉 JavaScript 時使用。
+建置首先呼叫 Rust 2024 Edition 的原生教材檢查工具 `tools/lesson-check`，使用標準函式庫驗證方塊格式及自然標題。接著 Node.js 24 使用 markdown-it 解析 CommonMark，highlight.js 在建置時處理 Rust、Shell 和 TOML。每章輸出各自的 `index.html`，網址可分享、深層連結可重新整理。少量瀏覽器原生 JS 提供搜尋、測驗、複製、主題、互動圖解與本機進度。搜尋索引在有搜尋詞時才下載，包含各章文字、程式碼及標題，支援繁體中文子字串與 Rust 診斷碼。閱讀、章節導覽與展開測驗解析可在關閉 JavaScript 時使用。
 
 CommonMark 可以直接在 GitHub 與 HackMD 編輯。技術圖解使用同庫 SVG 和 HTML/CSS，所有權圖由步驟資料驅動。GitHub Pages 提供靜態部署，讀者無須建立帳號，網站無需維護後端和資料庫。`BASE_PATH` 集中處理專案網站子路徑。
 
 課程內容與作者保留於 `content/`。章節名稱、網址、來源與遷移狀態在 `content/catalog.json`。摘要、搜尋索引和頁面均由同一套資料建置。使用者進度留存在同一網域與瀏覽器的 localStorage。清除網站資料或更換裝置會失去記錄。
+
+## Rust 化的演進方向
+
+目前是混合式建置：Rust 負責教材預檢，Node.js 仍負責 Markdown 解析、語法高亮、HTML 模板及搜尋索引。日後若將建置器逐步移植至 Rust，可評估 pulldown-cmark 等 CommonMark 解析器、模板引擎與高亮方案；先建立輸出相容性測試，再逐步替換。GitHub Pages 只接受靜態輸出，因此不需要改成持續運作的 Rust HTTP 伺服器。瀏覽器中的互動仍使用少量 JavaScript，只有適合的計算模組才評估 Rust/Wasm。維持既有網址、錨點、HackMD 編輯方式及瀏覽器學習紀錄。尚未完成全站 Rust 移植。
 
 ## HackMD 的編輯方式
 

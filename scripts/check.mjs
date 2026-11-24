@@ -8,6 +8,7 @@ const base = (process.env.BASE_PATH || '/').replace(/\/?$/, '/');
 const origin = 'https://rust-learning.test';
 const errors = [];
 const routes = new Map();
+const expectedNotes = new Map();
 const unique = (values) => new Set(values).size === values.length;
 const assets = new Set();
 let checkedLinks = 0;
@@ -29,6 +30,7 @@ if (sourceFiles.length !== catalog.length || catalog.some(entry=>!sourceFiles.in
 for (const entry of catalog) {
   if (!/^[\w-]{20,}$/.test(entry.source.id) || Number.isNaN(Date.parse(entry.source.modified)) || !Number.isInteger(entry.source.paragraphs)) errors.push(`${entry.slug} 缺少有效的來源記錄`);
   const lesson = await readLesson(entry);
+  expectedNotes.set(entry.slug, lesson.tokens.map(token => token.attrGet('data-callout')).filter(Boolean));
   const lines = (await readFile(join(projectRoot,'content',entry.slug+'.md'),'utf8')).split(/\r?\n/);
   if (!lesson.headings.length) errors.push(`${entry.slug} 缺少內容標題`);
   let headingLevel = 1;
@@ -66,11 +68,14 @@ for (const entry of chapters) {
   if (!page) continue;
   const notes = page.nodes.filter(node => attrs(node)['data-callout']);
   const kinds = notes.map(node => attrs(node)['data-callout']);
-  if (notes.length < Object.keys(calloutTypes).length || Object.values(calloutTypes).some(kind => !kinds.includes(kind))) {
-    errors.push(`${route} 缺少五種教學方塊`);
+  if (!kinds.length || kinds.some(kind => !calloutTypes.includes(kind)) || JSON.stringify(kinds) !== JSON.stringify(expectedNotes.get(entry.slug))) {
+    errors.push(`${route} 教學方塊與教材來源不一致`);
   }
   for (const note of notes) {
-    if (attrs(note).role !== 'note' || ![...elements(note)].some(node => attrs(node).class === 'callout-title')) {
+    const title = [...elements(note)].find(node => attrs(node).class === 'callout-title');
+    const textOf = node => node?.nodeName === '#text' ? node.value : (node?.childNodes ?? []).map(textOf).join('');
+    const titleText = textOf(title).trim();
+    if (attrs(note).role !== 'note' || !titleText || /callout:|^(來龍去脈|生活比喻|程式拆解|常見陷阱|動手驗收)$/.test(titleText)) {
       errors.push(`${route} 教學方塊缺少文字標題或語意`);
     }
   }

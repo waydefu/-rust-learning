@@ -2,7 +2,7 @@
 
 新版官方教材為非同步設立了獨立章節。非同步語法從 Rust 2018 Edition 起可用，本章以 Rust 2024 Edition 示範。
 
-> **來龍去脈**
+> **等待網路時，CPU 可以做別的事** <!-- callout:context -->
 >
 > 點餐後等待料理時，你可以先去做別的事，而不是一直站在廚房門口。網路和磁碟也經常需要等待；非同步讓程式在等待期間把執行機會交給其他工作，而不是每項等待都占著一條專用執行緒。
 
@@ -11,10 +11,6 @@
 當程式等待網路或磁碟回應時，CPU 可能暫時沒有實際計算工作。若每個等待都占用專屬 OS 執行緒，數量很大時執行緒記憶體和排程成本會明顯增加。非同步將許多可能等待的操作交給執行時系統協調，在可暫停點切換其他工作。
 
 比喻：餐廳只有一位服務生，送餐後不必站在桌邊等客人吃完，能先服務下一桌；await 就是允許暫停的地方。它不代表兩個人同時搬盤子，CPU 密集工作也不會因為加 async 而自動平行化。
-
-> **生活比喻**
->
-> Future 像一張尚未完成的取餐單；executor 是安排何時檢查工作進度的執行器；poll 是詢問進度，Pending 表示還沒好，Ready 表示結果已準備好，Waker 用來通知執行器之後應重新排程。不是每個 Future 都必須等待，第一次 poll 也可能完成。
 
 ## 二、async fn 回傳的不是當下結果
 
@@ -30,7 +26,7 @@ fn main() {
 
 呼叫 answer() 產生 Future，而不是立刻執行完取得 u32。Future 是描述未來可產生結果的狀態機抽象，通常需由執行器（executor）反覆 poll 才有進展。上面 main 不會印出 42，也沒有真正等待 future 結果。
 
-> **程式拆解**
+> **呼叫 async fn 不等於開始執行** <!-- callout:walkthrough -->
 >
 > `async fn answer() -> u32` 描述最終產出 u32 的非同步函式，但 `answer()` 當下建立的是 Future。只有被執行器 poll，函式本體才會推進。`.await` 等待結果，若目前還未完成，可以暫停當前 Future，讓執行器安排其他工作。
 
@@ -49,6 +45,10 @@ async fn double() -> u32 {
 跨越暫停點仍要使用的區域值會留在 Future 的狀態中。因此工作若由 Tokio 的多執行緒 `spawn` 排程，活過 `.await` 的資料也可能影響整個 Future 是否符合 `Send`。例如先取得 `std::sync::MutexGuard`，在 `.await` 前用區塊結束守衛作用域，通常比把守衛跨暫停點保存更清楚。
 
 比喻邊界：await 不保證會暫停，也不是等待時自動創一個執行緒；若所等待的 future 當下就準備好，可能直接繼續。
+
+> **取餐單如何對應 Future** <!-- callout:analogy -->
+>
+> Future 像一張尚未完成的取餐單；executor 是安排何時檢查工作進度的執行器；poll 是詢問進度，Pending 表示還沒好，Ready 表示結果已準備好，Waker 用來通知執行器之後應重新排程。不是每個 Future 都必須等待，第一次 poll 也可能完成。
 
 ## 四、Rust 標準庫為何不能單獨「執行」所有 async 工作？
 
@@ -73,7 +73,7 @@ async fn main() {
 
 CPU-bound（大量計算）可能需要 thread pool 或專門的阻塞任務 API；I/O-bound（網路、檔案等待）常受益於非同步。
 
-> **常見陷阱**
+> **async 不會讓阻塞操作自動變快** <!-- callout:warning -->
 >
 > async 不會自動增加 CPU 核心，也不是任意阻塞函式的加速器。在 async 任務裡呼叫阻塞操作仍可能卡住執行緒；長時間 CPU 運算也需要合適的工作分配。取消 Future 時要考慮已完成的外部副作用。
 
@@ -99,10 +99,6 @@ Task 被取消或 future 被 drop，尚未完成的操作可能因此停止；�
 
 不要在 async task 內長時間持有同步 Mutex guard 跨 await，可能妨礙排程、導致死鎖或不符合 Send 要求。必要時縮短鎖範圍或改用適當的 async mutex。
 
-> **動手驗收**
->
-> 先建立一個 async 函式，只呼叫、不 await，猜測函式本體是否會印字。再使用本章的 Tokio 執行範例 await 它，觀察差異。最後解釋兩個等待工作為何可以交錯推進，卻不一定平行執行。
-
 ## 十、驗收
 
 題1：為何呼叫 async fn 卻沒有 .await 可能不執行主要邏輯？
@@ -114,5 +110,9 @@ Task 被取消或 future 被 drop，尚未完成的操作可能因此停止；�
 題4：何時用 join!、何時用 spawn，取消會影響哪些外部副作用？
 
 驗收：能清楚區分 async、Future、await、executor、task、OS thread、parallelism；知道非同步不是免費加速。
+
+> **比較建立 Future 與真正 await** <!-- callout:practice -->
+>
+> 先建立一個 async 函式，只呼叫、不 await，猜測函式本體是否會印字。再使用本章的 Tokio 執行範例 await 它，觀察差異。最後解釋兩個等待工作為何可以交錯推進，卻不一定平行執行。
 
 參考：<https://doc.rust-lang.org/stable/book/ch17-00-async-await.html>

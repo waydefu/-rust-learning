@@ -1,6 +1,7 @@
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
-import { catalog, md, projectRoot, readLesson } from '../src/course.mjs';
+import { catalog, chapters, md, projectRoot, readLesson } from '../src/course.mjs';
 import { makeSite } from '../src/site.mjs';
 
 const inputBase = process.env.BASE_PATH || '/';
@@ -10,6 +11,11 @@ if (!/^\/(?:[\w.-]+\/)*[\w.-]*\/?$/.test(inputBase) || inputBase.startsWith('//'
 const base = inputBase.endsWith('/') ? inputBase : inputBase + '/';
 const dist = join(projectRoot, 'dist');
 const site = makeSite(base);
+// Native Rust preflight: reject malformed teaching notes before changing dist/.
+execFileSync(process.env.CARGO || 'cargo', [
+  'run', '--quiet', '--locked', '--manifest-path', 'tools/lesson-check/Cargo.toml', '--',
+  ...chapters.map(entry => 'content/' + entry.slug + '.md'),
+], { cwd: projectRoot, stdio: 'inherit' });
 const lessons = await Promise.all(catalog.map(readLesson));
 
 async function write(path, contents) {

@@ -4,7 +4,7 @@
 
 ## 本機使用
 
-需要 Node.js 24。編譯教材範例另需 Rustup 和 Rust 1.85.1（由 `rust-toolchain.toml` 指定）。一般閱讀只需瀏覽器。
+建置網站需要 Node.js 24、Cargo 及 Rust 1.85.1（由 `rust-toolchain.toml` 指定）。Rust 原生工具先驗證教材方塊，現有 Node.js 渲染器再產生靜態網站；一般閱讀只需瀏覽器。
 
 ```sh
 npm ci
@@ -17,6 +17,7 @@ npm run dev
 npm run build
 npm run check
 npm run check:rust
+cargo test --locked --manifest-path tools/lesson-check/Cargo.toml
 BASE_PATH=/-rust-learning/ npm run build
 BASE_PATH=/-rust-learning/ npm run check
 npx playwright install chromium
@@ -32,6 +33,7 @@ npm run test:browser
 | [content/](content/) | 教材 Markdown、章節路徑與來源索引 |
 | [src/](src/) | 頁面模板、圖解、測驗、樣式和瀏覽器互動 |
 | [scripts/](scripts/) | 產生靜態頁面、檢查內容與 Rust 範例 |
+| [tools/lesson-check/](tools/lesson-check/) | Rust 原生教材建置前檢查器 |
 | [examples/](examples/) | 外部 crate 範例的 Cargo 設定與鎖檔。程式碼從教材抽取 |
 | [tests/](tests/) | Playwright 操作與 axe 無障礙檢查 |
 | [.github/workflows/site.yml](.github/workflows/site.yml) | Pull request 驗證與 Pages 部署 |

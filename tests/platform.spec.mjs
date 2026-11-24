@@ -130,7 +130,7 @@ test('lesson and quiz explanation are readable without JavaScript', async ({brow
     await page.goto(address('chapters/ownership/'));
     await expect(page.getByRole('heading',{level:1})).toContainText('所有權');
     await expect(page.getByText(/drop 消耗 b/)).toBeVisible();
-    await expect(page.locator('[data-callout="context"] .callout-title')).toHaveText('來龍去脈');
+    await expect(page.locator('[data-callout="context"] .callout-title')).toHaveText('名字還在，資料就一定還在嗎？');
     await page.getByText('查看完整解析',{exact:true}).click();
     await expect(page.getByText('仍是同一個配置，由 b 負責釋放',{exact:true}).last()).toBeVisible();
   } finally {
@@ -141,7 +141,7 @@ test('lesson and quiz explanation are readable without JavaScript', async ({brow
 
 test('teaching notes have visible labels, themes and mobile layout', async ({page}) => {
   const types = ['context','analogy','walkthrough','warning','practice'];
-  const labels = ['來龍去脈','生活比喻','程式拆解','常見陷阱','動手驗收'];
+  const labels = ['按下跳躍鍵，電腦怎麼知道要跳？','從食譜到機器指令','第一個程式的四個部分','改了程式，為什麼還是舊畫面？','讓電腦說兩句不同的話'];
   await page.setViewportSize({width:320,height:790});
   await page.goto(target('chapters/getting-started/'));
   for (let i=0; i<types.length; i++) {
@@ -161,4 +161,6 @@ test('teaching notes have visible labels, themes and mobile layout', async ({pag
   expect((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze()).violations).toEqual([]);
   await page.goto(target('chapters/web-server/'));
   await expect(page.locator('.lesson-callout')).toHaveCount(5);
+  await expect(page.locator('[data-callout="context"] .callout-title')).toHaveText('網址輸入之後，瀏覽器做了什麼？');
+  await expect(page.locator('.prose')).not.toContainText('<!-- callout:');
 });
