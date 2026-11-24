@@ -438,7 +438,6 @@ pub(super) struct Report {
     pub messages: Vec<String>,
 }
 
-
 pub(super) fn check(lessons: &[Lesson<'_>]) -> Result<Report> {
     let root = Scratch::new()?;
     let project_root = env::current_dir().map_err(err)?;

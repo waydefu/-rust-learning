@@ -17,7 +17,6 @@ mod reader;
 mod schema;
 mod site_check;
 
-
 type Result<T> = std::result::Result<T, String>;
 const KINDS: [&str; 5] = ["context", "analogy", "walkthrough", "warning", "practice"];
 const ICONS: [&str; 7] = [

@@ -53,7 +53,6 @@ pub(super) struct Landing<'a> {
     pub stages: Vec<Stage<'a>>,
 }
 
-
 fn validate_entry(entry: &Entry<'_>, resource: bool) -> Result<()> {
     let digits = if resource {
         entry.id.strip_prefix('A').unwrap_or("")
@@ -97,7 +96,6 @@ fn card(
         ],
     )
 }
-
 
 pub(super) fn render(input: &Landing<'_>) -> Result<Vec<String>> {
     let base = input.base;
@@ -250,12 +248,15 @@ mod tests {
                 title: "入門",
                 description: "介紹",
                 icon: String::new(),
-                chapters: vec![(Entry {
-                    id: "01",
-                    path: "chapters/start",
-                    title: "開始",
-                    description: "內容",
-                }, false)],
+                chapters: vec![(
+                    Entry {
+                        id: "01",
+                        path: "chapters/start",
+                        title: "開始",
+                        description: "內容",
+                    },
+                    false,
+                )],
             }],
         };
         let html = render(&input).unwrap().join("\n");

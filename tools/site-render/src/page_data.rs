@@ -94,7 +94,6 @@ pub(super) fn render(base: &str, paths: &[(&str, &str)], data: &PageData<'_>) ->
     page
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

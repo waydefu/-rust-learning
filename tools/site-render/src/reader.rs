@@ -192,7 +192,6 @@ fn outline(toc: &[(&str, &str)], chapter: bool, ownership: bool) -> String {
     out
 }
 
-
 pub(super) fn render(
     base: &str,
     icons: [&str; 6],

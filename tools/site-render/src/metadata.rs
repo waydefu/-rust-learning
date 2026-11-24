@@ -134,16 +134,86 @@ mod tests {
     #[test]
     fn frozen_unicode_anchor_contract() {
         assert_eq!(
-            anchors(["ＡＢＣ ①", "abc 1", "繁體中文—Rust", "🦀", "", "É", "e\u{301}", "ΟΣ", "İ", "a\u{345}b", "Ⅳ", "𐐀"]),
-            ["s-abc-1", "s-abc-1-2", "s-繁體中文-rust", "s-section", "s-section-2", "s-é", "s-é-2", "s-ος", "s-i", "s-a-b", "s-iv", "s-𐐨"]
+            anchors([
+                "ＡＢＣ ①",
+                "abc 1",
+                "繁體中文—Rust",
+                "🦀",
+                "",
+                "É",
+                "e\u{301}",
+                "ΟΣ",
+                "İ",
+                "a\u{345}b",
+                "Ⅳ",
+                "𐐀"
+            ]),
+            [
+                "s-abc-1",
+                "s-abc-1-2",
+                "s-繁體中文-rust",
+                "s-section",
+                "s-section-2",
+                "s-é",
+                "s-é-2",
+                "s-ος",
+                "s-i",
+                "s-a-b",
+                "s-iv",
+                "s-𐐨"
+            ]
         );
         assert_eq!(
-            anchors(["a", "a", "a-2", "a", "a-2", "---", "😄", "C++", "C#", "你好 世界", "\tHello\nWorld"]),
-            ["s-a", "s-a-2", "s-a-2", "s-a-3", "s-a-2-2", "s-section", "s-section-2", "s-c", "s-c-2", "s-你好-世界", "s-hello-world"]
+            anchors([
+                "a",
+                "a",
+                "a-2",
+                "a",
+                "a-2",
+                "---",
+                "😄",
+                "C++",
+                "C#",
+                "你好 世界",
+                "\tHello\nWorld"
+            ]),
+            [
+                "s-a",
+                "s-a-2",
+                "s-a-2",
+                "s-a-3",
+                "s-a-2-2",
+                "s-section",
+                "s-section-2",
+                "s-c",
+                "s-c-2",
+                "s-你好-世界",
+                "s-hello-world"
+            ]
         );
         assert_eq!(
-            anchors(["مرحبا", "हिन्दी", "カタカナ", "ｶﾀｶﾅ", "中文", "中文", "０９", "ﬃ", "Ⅷ"]),
-            ["s-مرحبا", "s-ह-न-द", "s-カタカナ", "s-カタカナ-2", "s-中文", "s-中文-2", "s-09", "s-ffi", "s-viii"]
+            anchors([
+                "مرحبا",
+                "हिन्दी",
+                "カタカナ",
+                "ｶﾀｶﾅ",
+                "中文",
+                "中文",
+                "０９",
+                "ﬃ",
+                "Ⅷ"
+            ]),
+            [
+                "s-مرحبا",
+                "s-ह-न-द",
+                "s-カタカナ",
+                "s-カタカナ-2",
+                "s-中文",
+                "s-中文-2",
+                "s-09",
+                "s-ffi",
+                "s-viii"
+            ]
         );
         assert!(anchors([]).is_empty());
     }

@@ -103,7 +103,6 @@ pub(super) struct IndexEntry<'a> {
     pub headings: Vec<(&'a str, &'a str)>,
 }
 
-
 pub(super) fn verify(input: &Input<'_>) -> Result<Summary> {
     let base = input.base;
     let mut errors = Vec::new();

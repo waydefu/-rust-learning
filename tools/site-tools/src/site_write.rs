@@ -2,8 +2,7 @@
 //! native Rust copies the static assets and owns publication to the local dist.
 use std::{
     collections::HashSet,
-    fs,
-    io,
+    fs, io,
     path::{Path, PathBuf},
 };
 
@@ -155,10 +154,16 @@ mod tests {
             vec![("", "bad")],
         ] {
             assert!(write_site(&root.0, &files).is_err());
-            assert_eq!(fs::read_to_string(root.0.join("dist/keep.html")).unwrap(), "keep");
+            assert_eq!(
+                fs::read_to_string(root.0.join("dist/keep.html")).unwrap(),
+                "keep"
+            );
         }
         write_site(&root.0, &[("index.html", "教材🦀"), (".nojekyll", "")]).unwrap();
-        assert_eq!(fs::read_to_string(root.0.join("dist/index.html")).unwrap(), "教材🦀");
+        assert_eq!(
+            fs::read_to_string(root.0.join("dist/index.html")).unwrap(),
+            "教材🦀"
+        );
         assert_eq!(fs::read(root.0.join("dist/.nojekyll")).unwrap(), b"");
     }
 

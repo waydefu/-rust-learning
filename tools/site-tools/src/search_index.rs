@@ -123,8 +123,16 @@ mod tests {
             href: "/-rust-learning/chapters/ownership/",
             text: "Rust E0382 🦀",
             headings: vec![
-                Heading { id: "s-借用", label: "借用", level: 2 },
-                Heading { id: "s-細節", label: "細節", level: 4 },
+                Heading {
+                    id: "s-借用",
+                    label: "借用",
+                    level: 2,
+                },
+                Heading {
+                    id: "s-細節",
+                    label: "細節",
+                    level: 4,
+                },
             ],
         }
     }
