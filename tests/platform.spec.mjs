@@ -130,9 +130,35 @@ test('lesson and quiz explanation are readable without JavaScript', async ({brow
     await page.goto(address('chapters/ownership/'));
     await expect(page.getByRole('heading',{level:1})).toContainText('所有權');
     await expect(page.getByText(/drop 消耗 b/)).toBeVisible();
+    await expect(page.locator('[data-callout="context"] .callout-title')).toHaveText('來龍去脈');
     await page.getByText('查看完整解析',{exact:true}).click();
     await expect(page.getByText('仍是同一個配置，由 b 負責釋放',{exact:true}).last()).toBeVisible();
   } finally {
     await noJS.close();
   }
+});
+
+
+test('teaching notes have visible labels, themes and mobile layout', async ({page}) => {
+  const types = ['context','analogy','walkthrough','warning','practice'];
+  const labels = ['來龍去脈','生活比喻','程式拆解','常見陷阱','動手驗收'];
+  await page.setViewportSize({width:320,height:790});
+  await page.goto(target('chapters/getting-started/'));
+  for (let i=0; i<types.length; i++) {
+    const note = page.locator(`[data-callout="${types[i]}"]`);
+    await expect(note).toHaveCount(1);
+    await expect(note.locator('.callout-title')).toHaveText(labels[i]);
+  }
+  const notes = page.locator('.lesson-callout');
+  const colors = () => notes.evaluateAll(nodes => nodes.map(node => getComputedStyle(node).backgroundColor));
+  const light = await colors();
+  expect(new Set(light).size).toBe(5);
+  await page.getByRole('button',{name:'切換深色模式'}).click();
+  const dark = await colors();
+  expect(new Set(dark).size).toBe(5);
+  expect(dark).not.toEqual(light);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+  expect((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze()).violations).toEqual([]);
+  await page.goto(target('chapters/web-server/'));
+  await expect(page.locator('.lesson-callout')).toHaveCount(5);
 });
