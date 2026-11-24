@@ -25,6 +25,7 @@ fn main() {
     });
     handle.join().expect("執行緒失敗");
 }
+// 預期輸出: 來自 worker
 ```
 
 spawn 建立 OS 執行緒；move 閉包取得 name 所有權，避免新執行緒持有可能已被呼叫者釋放的區域資料。join 等待執行緒結束並回報 panic 等結果；沒有 join 不代表必然等到它工作完成。
@@ -46,6 +47,7 @@ fn main() {
     let message = rx.recv().unwrap();
     println!("{message}");
 }
+// 預期輸出: 完成
 ```
 
 通道把資訊從傳送端交給接收端，send 消耗傳入的 String，所有權移給接收者。當傳送端消失、接收端消失等情況發生時，通道操作可能回傳錯誤；不能假設 recv 永遠成功。
@@ -70,6 +72,7 @@ fn main() {
     for h in handles { h.join().unwrap(); }
     println!("{}", *counter.lock().unwrap());
 }
+// 預期輸出: 4
 ```
 
 鎖的核心：在 guard 存在時，其他需要同一把鎖的工作不能同時進入臨界區。RAII guard 離開作用域自動釋放鎖。鎖定、等待與上下文切換都有成本；不是所有共享值都該包 Mutex。

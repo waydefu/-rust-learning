@@ -442,3 +442,42 @@ dialog::backdrop { background: #0c1223a8; }
   .startup-motion { display: none !important; }
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
+
+
+/* Motion v2: spatial feedback without fading readable text or blocking input. */
+.reading-indicator {
+  position: fixed; inset: 0 0 auto; height: 3px; z-index: 90;
+  pointer-events: none; background: transparent;
+}
+.reading-indicator > span {
+  display: block; width: 100%; height: 100%; transform: scaleX(0);
+  transform-origin: left center; background: linear-gradient(90deg,#d85f39,#ffac79);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hero-copy { animation-duration: .48s; }
+  .hero-figure { animation-duration: .62s; }
+  .chapter-card:focus-within { transform: translateY(-2px); }
+  .desktop-toc a[aria-current="location"] { animation: rust-toc-in .22s var(--motion-ease) both; }
+  .reading-indicator > span { transition: transform .12s linear; }
+  .button:active, .icon-button:active, .lab-controls button:active { transform: scale(.98); }
+  .startup-motion { animation-duration: 1.25s; }
+  @media (max-width: 600px) {
+    .startup-motion { inset: auto 12px max(12px, env(safe-area-inset-bottom)) auto; max-width: calc(100vw - 24px); }
+    .hero-copy, .hero-figure, .lesson-head { animation-duration: .32s; animation-delay: 0s; }
+  }
+}
+@keyframes rust-toc-in { from { transform: translateX(-3px); } to { transform: none; } }
+
+
+/* Compact interactive teaching models. All state is also spelled out in text. */
+.prose .concept-lab { border: 1px solid var(--line); background: var(--paper); border-radius: 14px; padding: 16px; margin: 20px 0 26px; }
+.prose .concept-lab h3 { margin: 0 0 8px; }
+.concept-view { display: flex; gap: 6px; flex-wrap: wrap; margin: 14px 0; }
+.concept-cell { display: grid; place-items: center; min-width: 34px; min-height: 38px; padding: 5px 8px; border: 1px dashed var(--line-strong); border-radius: 7px; color: var(--muted); font: 600 .84rem var(--mono); }
+.concept-cell[data-filled="true"] { border-style: solid; border-color: var(--accent); background: var(--tint); color: var(--ink); }
+.concept-controls { display: flex; flex-wrap: wrap; gap: 8px; }
+.concept-button { cursor: pointer; min-height: 44px; padding: 7px 12px; border: 1px solid var(--line-strong); border-radius: 8px; font: inherit; color: var(--ink); background: var(--paper); }
+.concept-button:hover:not(:disabled) { border-color: var(--accent); background: var(--tint); }
+.concept-button:disabled { cursor: default; opacity: .65; }
+.prose .concept-status { margin: 12px 0 0; min-height: 3em; color: var(--ink); font-size: .9rem; }
+@media (max-width: 600px) { .prose .concept-lab { padding: 12px; } .concept-button { flex: 1 1 auto; } }

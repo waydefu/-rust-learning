@@ -1,7 +1,11 @@
 //! Build the browser search index from the existing Markdown parser's data.
 //! The NUL-separated UTF-8 bridge is temporary; it carries fields, not JSON.
 //! Rust owns the index schema, heading filtering, and JSON serialization.
-use std::{fmt::Write as _, io::{self, Read, Write}, process::ExitCode};
+use std::{
+    fmt::Write as _,
+    io::{self, Read, Write},
+    process::ExitCode,
+};
 
 const LIMIT: u64 = 16 * 1024 * 1024;
 
@@ -25,12 +29,18 @@ fn field<'a>(fields: &mut impl Iterator<Item = &'a str>) -> Result<&'a str, Stri
 }
 
 fn count<'a>(fields: &mut impl Iterator<Item = &'a str>, limit: usize) -> Result<usize, String> {
-    field(fields)?.parse::<usize>().ok().filter(|&n| n <= limit)
+    field(fields)?
+        .parse::<usize>()
+        .ok()
+        .filter(|&n| n <= limit)
         .ok_or_else(|| "搜尋資料數量無效".into())
 }
 
 fn decode(input: &str) -> Result<Vec<Lesson<'_>>, String> {
-    let mut fields = input.strip_suffix('\0').ok_or("搜尋資料缺少結尾")?.split('\0');
+    let mut fields = input
+        .strip_suffix('\0')
+        .ok_or("搜尋資料缺少結尾")?
+        .split('\0');
     if field(&mut fields)? != "rust-search-v1" {
         return Err("搜尋資料版本不相容".into());
     }
@@ -43,9 +53,14 @@ fn decode(input: &str) -> Result<Vec<Lesson<'_>>, String> {
         let description = field(&mut fields)?;
         let href = field(&mut fields)?;
         let text = field(&mut fields)?;
-        if title.is_empty() || id.is_empty() || text.is_empty()
-            || !href.starts_with('/') || href.starts_with("//") || !href.ends_with('/')
-            || !ids.insert(id) {
+        if title.is_empty()
+            || id.is_empty()
+            || text.is_empty()
+            || !href.starts_with('/')
+            || href.starts_with("//")
+            || !href.ends_with('/')
+            || !ids.insert(id)
+        {
             return Err("搜尋條目識別碼、路徑或內容無效".into());
         }
         let n = count(&mut fields, 5000)?;
@@ -59,7 +74,14 @@ fn decode(input: &str) -> Result<Vec<Lesson<'_>>, String> {
             }
             headings.push(Heading { id, label, level });
         }
-        lessons.push(Lesson { title, id, description, href, text, headings });
+        lessons.push(Lesson {
+            title,
+            id,
+            description,
+            href,
+            text,
+            headings,
+        });
     }
     if fields.next().is_some() {
         return Err("搜尋資料包含多餘欄位".into());
@@ -79,7 +101,9 @@ fn string(out: &mut String, value: &str) {
             '\t' => out.push_str("\\t"),
             '\u{08}' => out.push_str("\\b"),
             '\u{0c}' => out.push_str("\\f"),
-            c if c <= '\u{1f}' => { write!(out, "\\u{:04x}", c as u32).expect("String write"); }
+            c if c <= '\u{1f}' => {
+                write!(out, "\\u{:04x}", c as u32).expect("String write");
+            }
             c => out.push(c),
         }
     }
@@ -95,18 +119,29 @@ fn property(out: &mut String, name: &str, value: &str) {
 fn encode(lessons: &[Lesson<'_>]) -> String {
     let mut out = String::from("[");
     for (i, lesson) in lessons.iter().enumerate() {
-        if i != 0 { out.push(','); }
+        if i != 0 {
+            out.push(',');
+        }
         out.push('{');
         for (i, (name, value)) in [
-            ("title", lesson.title), ("id", lesson.id), ("description", lesson.description),
+            ("title", lesson.title),
+            ("id", lesson.id),
+            ("description", lesson.description),
             ("href", lesson.href),
-        ].into_iter().enumerate() {
-            if i != 0 { out.push(','); }
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            if i != 0 {
+                out.push(',');
+            }
             property(&mut out, name, value);
         }
         out.push_str(",\"headings\":[");
         for (i, heading) in lesson.headings.iter().filter(|h| h.level <= 3).enumerate() {
-            if i != 0 { out.push(','); }
+            if i != 0 {
+                out.push(',');
+            }
             out.push('{');
             property(&mut out, "id", heading.id);
             out.push(',');
@@ -123,8 +158,13 @@ fn encode(lessons: &[Lesson<'_>]) -> String {
 
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut input = String::new();
-    io::stdin().lock().take(LIMIT + 1).read_to_string(&mut input)?;
-    if input.len() as u64 > LIMIT { return Err("搜尋資料超過大小限制".into()); }
+    io::stdin()
+        .lock()
+        .take(LIMIT + 1)
+        .read_to_string(&mut input)?;
+    if input.len() as u64 > LIMIT {
+        return Err("搜尋資料超過大小限制".into());
+    }
     let lessons = decode(&input)?;
     io::stdout().lock().write_all(encode(&lessons).as_bytes())?;
     Ok(())
@@ -133,7 +173,10 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 fn main() -> ExitCode {
     match run() {
         Ok(()) => ExitCode::SUCCESS,
-        Err(err) => { eprintln!("search-index: {err}"); ExitCode::FAILURE }
+        Err(err) => {
+            eprintln!("search-index: {err}");
+            ExitCode::FAILURE
+        }
     }
 }
 
@@ -142,14 +185,33 @@ mod tests {
     use super::*;
 
     fn sample() -> String {
-        ["rust-search-v1","1","所有權","04","借用","/-rust-learning/chapters/ownership/",
-         "Rust E0382 🦀","2","s-借用","借用","2","s-細節","細節","4",""].join("\0")
+        [
+            "rust-search-v1",
+            "1",
+            "所有權",
+            "04",
+            "借用",
+            "/-rust-learning/chapters/ownership/",
+            "Rust E0382 🦀",
+            "2",
+            "s-借用",
+            "借用",
+            "2",
+            "s-細節",
+            "細節",
+            "4",
+            "",
+        ]
+        .join("\0")
     }
 
     #[test]
     fn preserves_search_schema_and_filters_deep_headings() {
         let input = sample();
-        assert_eq!(encode(&decode(&input).unwrap()), r#"[{"title":"所有權","id":"04","description":"借用","href":"/-rust-learning/chapters/ownership/","headings":[{"id":"s-借用","label":"借用"}],"text":"Rust E0382 🦀"}]"#);
+        assert_eq!(
+            encode(&decode(&input).unwrap()),
+            r#"[{"title":"所有權","id":"04","description":"借用","href":"/-rust-learning/chapters/ownership/","headings":[{"id":"s-借用","label":"借用"}],"text":"Rust E0382 🦀"}]"#
+        );
     }
 
     #[test]

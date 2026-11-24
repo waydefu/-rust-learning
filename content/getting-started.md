@@ -100,6 +100,7 @@ cd ~/rust-learning/day01
 fn main() {
     println!("Hello, Rust!");
 }
+// 預期輸出: Hello, Rust!
 ```
 
 ### 2. 每個符號代表什麼？

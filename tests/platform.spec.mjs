@@ -188,3 +188,70 @@ test('reduced motion skips welcome and keeps deep links usable', async ({page}) 
   await expect(page.locator('#ownership-lab')).toBeVisible();
   await expect(page.locator('.startup-motion')).toHaveCount(0);
 });
+
+
+test('reading indicator tracks scroll and remains decorative', async ({page}) => {
+  await page.emulateMedia({reducedMotion:'reduce'});
+  await page.goto(target('chapters/ownership/'));
+  const indicator = page.locator('.reading-indicator');
+  await expect(indicator).toHaveAttribute('aria-hidden','true');
+  await expect(indicator).toHaveCSS('pointer-events','none');
+  await page.evaluate(() => scrollTo(0,0));
+  await expect.poll(() => indicator.locator('span').evaluate(el => el.style.transform)).toBe('scaleX(0)');
+  await page.evaluate(() => scrollTo(0,document.documentElement.scrollHeight));
+  await expect.poll(() => indicator.locator('span').evaluate(el => Number(el.style.transform.slice(7,-1)))).toBeGreaterThan(.99);
+  expect(await indicator.locator('span').evaluate(el => parseFloat(getComputedStyle(el).transitionDuration))).toBeLessThan(0.01);
+});
+
+test('switching reduced motion while welcome is active removes it', async ({page}) => {
+  await page.emulateMedia({reducedMotion:'no-preference'});
+  await page.goto(target());
+  await expect(page.locator('.startup-motion')).toHaveCount(1);
+  await page.emulateMedia({reducedMotion:'reduce'});
+  await expect(page.locator('.startup-motion')).toHaveCount(0);
+  await expect(page.getByRole('link',{name:'開始學習'})).toBeVisible();
+});
+
+
+test('interactive Vec capacity, race and Future models explain state', async ({page}) => {
+  await page.goto(target('chapters/collections/'));
+  let lab=page.locator('[data-concept-lab="vec"]');
+  for(let i=0;i<3;i++) await lab.getByRole('button',{name:'push 一個元素'}).click();
+  await expect(lab.getByRole('status')).toContainText('len = 3，capacity = 4');
+  await lab.getByRole('button',{name:'pop 一個元素'}).click();
+  await expect(lab.getByRole('status')).toContainText('len = 2，capacity = 4');
+  await page.goto(target('chapters/concurrency/'));
+  lab=page.locator('[data-concept-lab="race"]');
+  for(let i=0;i<4;i++) await lab.getByRole('button',{name:'執行下一步'}).click();
+  await expect(lab.getByRole('status')).toContainText('一次更新遺失');
+  await lab.getByRole('button',{name:'改用 Mutex'}).click();
+  for(let i=0;i<4;i++) await lab.getByRole('button',{name:'執行下一步'}).click();
+  await expect(lab.getByRole('status')).toContainText('結果為 2');
+  await page.goto(target('chapters/async/'));
+  lab=page.locator('[data-concept-lab="future"]');
+  await lab.getByRole('button',{name:'poll()'}).click();
+  await expect(lab.getByRole('button',{name:'poll()'})).toBeDisabled();
+  await lab.getByRole('button',{name:'模擬 I/O 喚醒'}).click();
+  await lab.getByRole('button',{name:'poll()'}).click();
+  await expect(lab.getByRole('status')).toContainText('Ready(42)');
+});
+
+
+test('iterator laziness and Rc reference count are observable', async ({page}) => {
+  await page.goto(target('chapters/iterators/'));
+  let lab=page.locator('[data-concept-lab="iterator"]');
+  await lab.getByRole('button',{name:'建立 filter'}).click();
+  await expect(lab.getByRole('status')).toContainText('尚未走訪元素');
+  await lab.getByRole('button',{name:'建立 map'}).click();
+  await lab.getByRole('button',{name:'collect()'}).click();
+  await expect(lab.getByRole('status')).toContainText('[20, 40]');
+  await page.goto(target('chapters/smart-pointers/'));
+  lab=page.locator('[data-concept-lab="rc"]');
+  await lab.getByRole('button',{name:'Rc::clone'}).click();
+  await expect(lab.getByRole('status')).toContainText('strong_count = 2');
+  await lab.getByRole('button',{name:'drop 一個 Rc'}).click();
+  await expect(lab.getByRole('status')).toContainText('保留資料');
+  await lab.getByRole('button',{name:'drop 一個 Rc'}).click();
+  await expect(lab.getByRole('status')).toContainText('內容被清理');
+  await expect(lab.getByRole('button',{name:'Rc::clone'})).toBeDisabled();
+});

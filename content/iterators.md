@@ -70,6 +70,7 @@ let mut inc = || { count += 1; };
 inc();
 inc();
 println!("{count}");
+// 預期輸出: 2
 ```
 
 move 閉包要求捕獲環境以值方式帶入閉包，常用在執行緒等需要獨立持有資料的場合；不代表閉包內每次呼叫都必定移動所有捕獲值。
@@ -87,6 +88,7 @@ let damage = [12, 30, 8, 41];
 let high: Vec<_> = damage.iter().copied().filter(|x| *x >= 20).collect();
 let total: i32 = high.iter().sum();
 println!("{high:?}，總傷害 {total}");
+// 預期輸出: [30, 41]，總傷害 71
 ```
 
 copied() 將 &i32 轉成 i32，因 i32 是 Copy；對 String 不能同樣無成本複製內容。

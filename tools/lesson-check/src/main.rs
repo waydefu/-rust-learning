@@ -52,7 +52,10 @@ fn inspect(source: &str) -> Result<usize, Vec<String>> {
             if GENERIC_TITLES.iter().any(|title| {
                 line.strip_prefix("> **").and_then(|s| s.strip_suffix("**")) == Some(*title)
             }) {
-                errors.push(format!("第 {} 行：使用具體內容作為標題，不使用內部分類", i + 1));
+                errors.push(format!(
+                    "第 {} 行：使用具體內容作為標題，不使用內部分類",
+                    i + 1
+                ));
             }
             continue;
         }
@@ -72,8 +75,10 @@ fn inspect(source: &str) -> Result<usize, Vec<String>> {
             count += 1;
         }
         if lines.get(i + 1).copied() != Some(">")
-            || !lines.get(i + 2).and_then(|line| line.strip_prefix("> "))
-                .is_some_and(|body| !body.trim().is_empty())
+            || lines
+                .get(i + 2)
+                .and_then(|line| line.strip_prefix("> "))
+                .is_none_or(|body| body.trim().is_empty())
         {
             errors.push(format!("第 {} 行：教學方塊缺少正文", i + 1));
         }
@@ -81,7 +86,11 @@ fn inspect(source: &str) -> Result<usize, Vec<String>> {
     if count == 0 {
         errors.push("至少需要一個教學方塊".into());
     }
-    if errors.is_empty() { Ok(count) } else { Err(errors) }
+    if errors.is_empty() {
+        Ok(count)
+    } else {
+        Err(errors)
+    }
 }
 
 fn check_file(path: &Path) -> Result<usize, Vec<String>> {
@@ -122,9 +131,14 @@ mod tests {
     use super::*;
 
     fn valid() -> String {
-        KINDS.iter().enumerate().map(|(i, kind)| {
-            format!("> **問題 {i}？** <!-- callout:{kind} -->\n>\n> 具體內容。\n\n")
-        }).collect::<Vec<_>>().join("")
+        KINDS
+            .iter()
+            .enumerate()
+            .map(|(i, kind)| {
+                format!("> **問題 {i}？** <!-- callout:{kind} -->\n>\n> 具體內容。\n\n")
+            })
+            .collect::<Vec<_>>()
+            .join("")
     }
 
     #[test]
@@ -141,8 +155,14 @@ mod tests {
 
     #[test]
     fn permits_flexible_note_counts_and_repeated_kinds() {
-        assert_eq!(inspect(&valid().replace("callout:analogy", "callout:context")), Ok(5));
-        assert_eq!(inspect("> **一個具體問題？** <!-- callout:context -->\n>\n> 解釋。\n"), Ok(1));
+        assert_eq!(
+            inspect(&valid().replace("callout:analogy", "callout:context")),
+            Ok(5)
+        );
+        assert_eq!(
+            inspect("> **一個具體問題？** <!-- callout:context -->\n>\n> 解釋。\n"),
+            Ok(1)
+        );
     }
 
     #[test]
@@ -153,7 +173,10 @@ mod tests {
 
     #[test]
     fn ignores_examples_inside_fenced_code() {
-        let source = format!("````text\n```\n> **忽略** <!-- callout:context -->\n````\n{}", valid());
+        let source = format!(
+            "````text\n```\n> **忽略** <!-- callout:context -->\n````\n{}",
+            valid()
+        );
         assert_eq!(inspect(&source), Ok(5));
     }
 
