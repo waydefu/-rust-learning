@@ -21,7 +21,7 @@
 | 章節標題元資料、Unicode 錨點 | 已驗證、已部署 | 31 篇逐項比對、Unicode 邊界案例；catalog 讀取與搜尋全文尚在 JS |
 | 導覽、首頁、互動教材模板 | 側欄導覽已部署；首頁、資源與互動模板 PR CI 通過 | 34 頁 DOM 與瀏覽器測試 |
 | 語法高亮、範例抽取、網站檢查 | 原生規則與執行器已提交；高亮零回退驗收以 PR #12 最新 CI 為準 | fenced code、診斷、測試與輸出契約 |
-| Rust CLI 總入口 | 未移植 | 完整 build/check/dev 行為錄製與重播 |
+| Rust CLI 總入口 | 已移植、已部署（PR #13） | 完整 build/check/dev 行為錄製與重播 |
 
 ## 第一個 rust-anything 單元：site-write
 
@@ -76,8 +76,15 @@ PR #10 已合併；PR #11 拆分 Pages 產物上傳與部署 job，main `3d983a3
 
 ## 第十階段：純 Rust CLI 與完整行為對照
 
-PR #12 已合併，main a51017e 的 Actions #40 首次發布成功。此 PR #13 新增 site-render 的 build/check/check-rust/dev 入口，讀取同一份 catalog.json、site-data.json 及原始教材，使用鎖定 serde_json、scraper/html5ever、url 取代 Node 解碼橋接；高亮、Markdown、模板、互動 JSON、索引、驗證規則與原生工具協作均由 Rust 執行。正式 Pages job 不再執行 npm ci，Node 只用於參考版及瀏覽器測試。CI 新增完整網站樹對照、錯誤路徑拒絕、原生檢查器正負例、Rust 範例對照及無 Node 的獨立驗證。根目錄和子路徑的原生輸出均須通過。實際 CI 結果以 PR #13 最新紀錄為準；未合併或部署。rust-anything writer 原有 14 案重播保留。另以全 CLI 實際執行的黑箱觀察 adapter 錄製根路徑、Pages 子路徑、無效路徑、缺少教材、範例執行與本機 HTTP 預覽六案；每次重新複製真實課程樹，以全部輸出 SHA-256（報告 JSON 僅正規化 key order）、退出碼、保留舊產物、驗證摘要及 HTTP status/header/body 雜湊為觀察契約，原版和 Rust 皆須重播成功，無 fallback。adapter 只供驗收，不是正式 CLI 依賴。未使用上游 scaffold，故不宣稱執行 app lift。
+PR #12 已合併，main a51017e 的 Actions #40 首次發布成功。此 PR #13 新增 site-render 的 build/check/check-rust/dev 入口，讀取同一份 catalog.json、site-data.json 及原始教材，使用鎖定 serde_json、scraper/html5ever、url 取代 Node 解碼橋接；高亮、Markdown、模板、互動 JSON、索引、驗證規則與原生工具協作均由 Rust 執行。正式 Pages job 不再執行 npm ci，Node 只用於參考版及瀏覽器測試。CI 新增完整網站樹對照、錯誤路徑拒絕、原生檢查器正負例、Rust 範例對照及無 Node 的獨立驗證。根目錄和子路徑的原生輸出均須通過。PR #13 已合併，main `9cffa93` 的 [Actions](https://github.com/waydefu/-rust-learning/actions/runs/45386706262) 全部成功，並確認線上版本。rust-anything writer 原有 14 案重播保留。另以全 CLI 實際執行的黑箱觀察 adapter 錄製根路徑、Pages 子路徑、無效路徑、缺少教材、範例執行與本機 HTTP 預覽六案；每次重新複製真實課程樹，以全部輸出 SHA-256（報告 JSON 僅正規化 key order）、退出碼、保留舊產物、驗證摘要及 HTTP status/header/body 雜湊為觀察契約，原版和 Rust 皆須重播成功，無 fallback。adapter 只供驗收，不是正式 CLI 依賴。未使用上游 scaffold，故不宣稱執行 app lift。
 
 ### 動效與無障礙
 
 首頁啟動提示使用 CSS 與既有瀏覽器 JS，在每個分頁工作階段至多播放一次；無遮罩、不阻擋點擊、不搶焦點，深層錨點與 reduced-motion 不播放。卡片、按鈕、閱讀頁首、對話框、測驗及記憶體圖採短時動畫，不延遲導覽或正文。無 JavaScript 時教材仍直接可讀。Playwright 驗證啟動提示、工作階段與減少動態效果。
+
+
+## 後續品質維護
+- 目前的原版對照是回歸基準，不證明所有新輸入正確；新增規則須搭配獨立正負例。
+- `rust run` 可用自然程式註解 `// 預期輸出: 文字` 宣告確定性輸出，依序比對完整執行輸出（含換行，CRLF 正規化）；無註解仍只檢查結束狀態。不要用於亂數、耗時或互動輸出。
+- 範例暫存工作目錄不是安全沙箱；只執行受信任的教材，勿在具有私密憑證的環境執行未審查 PR。
+- 分支保護、已合併分支清理與實機測試需由維護者核准或提供相應環境。不要因移植完成就刪除仍用於驗收的 Node 基準。

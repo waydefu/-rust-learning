@@ -188,3 +188,26 @@ test('reduced motion skips welcome and keeps deep links usable', async ({page}) 
   await expect(page.locator('#ownership-lab')).toBeVisible();
   await expect(page.locator('.startup-motion')).toHaveCount(0);
 });
+
+
+test('reading indicator tracks scroll and remains decorative', async ({page}) => {
+  await page.emulateMedia({reducedMotion:'reduce'});
+  await page.goto(target('chapters/ownership/'));
+  const indicator = page.locator('.reading-indicator');
+  await expect(indicator).toHaveAttribute('aria-hidden','true');
+  await expect(indicator).toHaveCSS('pointer-events','none');
+  await page.evaluate(() => scrollTo(0,0));
+  await expect.poll(() => indicator.locator('span').evaluate(el => el.style.transform)).toBe('scaleX(0)');
+  await page.evaluate(() => scrollTo(0,document.documentElement.scrollHeight));
+  await expect.poll(() => indicator.locator('span').evaluate(el => el.style.transform)).toBe('scaleX(1)');
+  expect(await indicator.locator('span').evaluate(el => parseFloat(getComputedStyle(el).transitionDuration))).toBeLessThan(0.01);
+});
+
+test('switching reduced motion while welcome is active removes it', async ({page}) => {
+  await page.emulateMedia({reducedMotion:'no-preference'});
+  await page.goto(target());
+  await expect(page.locator('.startup-motion')).toHaveCount(1);
+  await page.emulateMedia({reducedMotion:'reduce'});
+  await expect(page.locator('.startup-motion')).toHaveCount(0);
+  await expect(page.getByRole('link',{name:'開始學習'})).toBeVisible();
+});

@@ -1,4 +1,5 @@
-//! Execute trusted, checked-in Rust lesson examples in an isolated temporary directory.
+//! Execute trusted, checked-in Rust lesson examples in a temporary working directory.
+//! This is not an OS sandbox; never run unreviewed snippets with local credentials.
 use super::{Result,count,emit,field};
 use std::{collections::{BTreeMap,BTreeSet},env,fs,io,path::{Path,PathBuf},process::{Command,Stdio},thread,time::{Duration,Instant,SystemTime,UNIX_EPOCH}};
 
@@ -53,6 +54,20 @@ fn diagnostics(text:&str)->BTreeSet<String>{
         if code.len()==5&&code.starts_with('E')&&code.as_bytes()[1..].iter().all(u8::is_ascii_digit){Some(code.to_owned())}else{None}
     }).collect()
 }
+// Explicit line-by-line output contract for deterministic run examples.
+// No annotation means exit-status validation only. Output uses LF on all platforms.
+fn expected_output(source: &str) -> Option<String> {
+    let lines: Vec<_> = source.lines().filter_map(|line| {
+        line.trim_start().strip_prefix("// 預期輸出: ").map(str::to_owned)
+    }).collect();
+    if lines.is_empty() { None } else { Some(lines.join("\n") + "\n") }
+}
+fn verify_output(expected: &str, actual: &str) -> Result<()> {
+    let actual = actual.replace("\r\n", "\n");
+    if actual == expected { Ok(()) } else {
+        Err(format!("預期輸出 {expected:?}，實際 {actual:?}"))
+    }
+}
 fn safe_name(s:&str)->bool{!s.is_empty()&&s.as_bytes()[0].is_ascii_lowercase()&&s.bytes().all(|b|b.is_ascii_lowercase()||b==b'_')}
 fn safe_file(s:&str)->bool{
     let Some(p)=s.strip_prefix("src/")else{return false};
@@ -101,7 +116,13 @@ impl Runner{
         flags.extend(["-o",binary,fixture]);
         success(command(&self.rustc,&flags,&self.root,&self.log,20)?)?;
         self.stats.compiled+=1;
-        if matches!(mode,"run"|"test"){success(command(&self.binary,&[],&self.root,&self.log,20)?)?;self.stats.run+=1;}
+        if matches!(mode,"run"|"test"){
+            let output=command(&self.binary,&[],&self.root,&self.log,20)?;
+            if mode=="run" && output.success {
+                if let Some(expected)=expected_output(source){verify_output(&expected,&output.text)?;}
+            }
+            success(output)?;self.stats.run+=1;
+        }
         Ok(())
     }
     fn project(&self,name:&str,files:&BTreeMap<String,String>,project_root:&Path)->Result<()>{
@@ -173,6 +194,13 @@ pub(super) fn process_examples<'a>(n:usize,f:&mut impl Iterator<Item=&'a str>,ou
         assert_eq!(as_binary("let a=1;"),"fn main() {\nlet a=1;\n}\n");
         assert_eq!(as_binary("  async fn main() {}"),"  async fn main() {}");
         assert!(safe_file("src/bin/random.rs"));assert!(!safe_file("src/../main.rs"));
+    }
+    #[test]fn expected_output_contract(){
+        assert_eq!(expected_output("// 預期輸出: a\n// 預期輸出: b\n").as_deref(),Some("a\nb\n"));
+        assert_eq!(expected_output("let x = 1;"),None);
+        assert!(verify_output("a\n","a\r\n").is_ok());
+        assert!(verify_output("a\n","b\n").is_err());
+        assert!(verify_output("a\n","a\nextra\n").is_err());
     }
     #[test]fn exact_error_codes(){
         let d=diagnostics("snippet.rs:1:2: error[E0382]: moved\nsnippet.rs:2:3: warning: ignored\nerror: aborting");

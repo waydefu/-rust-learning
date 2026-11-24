@@ -1,5 +1,5 @@
 //! Native static rendering, highlighting, document templates and verification.
-//! The Node bridge supplies structured facts and checks the old output.
+//! The production CLI reads course data natively; Node is a test oracle only.
 use pulldown_cmark::{html, CodeBlockKind, CowStr, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 use std::{collections::HashMap, io::{self, Read, Write}, process::ExitCode};
 
@@ -76,6 +76,11 @@ fn callout<'a>(events: &[Event<'a>], start: usize) -> Option<(usize, usize, &'a 
 fn markdown(source: &str, headings: &[Heading<'_>], fences: &[Fence<'_>]) -> Result<(String, String)> {
     let options = Options::ENABLE_TABLES | Options::ENABLE_STRIKETHROUGH;
     let events: Vec<_> = Parser::new_ext(source, options).collect();
+    // Validate the full stream before any special handling (including titles and callouts).
+    if events.iter().any(|event| matches!(event,
+        Event::Start(Tag::Link { dest_url, .. } | Tag::Image { dest_url, .. }) if !safe_url(dest_url))) {
+        return Err("拒絕不安全的 Markdown 網址".into());
+    }
     if !matches!(events.first(), Some(Event::Start(Tag::Heading { level: HeadingLevel::H1, .. }))) {
         return Err("教材必須以 H1 開頭".into());
     }
@@ -295,6 +300,9 @@ mod tests {
         assert!(rest.contains("&lt;script&gt;"));
         assert!(!rest.contains("<script>"));
         assert!(markdown("# 教材\n\n[x](javascript:alert)\n", &[], &[]).is_err());
+        assert!(markdown("# 教材\n\n> **[x](javascript:alert)** <!-- callout:context -->\n>\n> 說明。\n", &[], &[]).is_err());
+        assert!(markdown("# [x](javascript:alert)\n\n說明。\n", &[], &[]).is_err());
+        assert!(markdown("# 教材\n\n> **[x](https://example.com)** <!-- callout:context -->\n>\n> 說明。\n", &[], &[]).is_ok());
     }
 
     #[test]

@@ -10,6 +10,23 @@ const storage = {
 };
 
 const root = document.documentElement;
+const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
+const feedbackAnimations = new WeakMap();
+const activeAnimations = new Set();
+function motionFeedback(element, frames, duration = 220) {
+  if (!element || motionPreference.matches || typeof element.animate !== 'function') return;
+  feedbackAnimations.get(element)?.cancel();
+  const animation = element.animate(frames, {duration, easing: 'cubic-bezier(.2,.75,.25,1)'});
+  feedbackAnimations.set(element, animation);
+  activeAnimations.add(animation);
+  const cleanup = () => activeAnimations.delete(animation);
+  animation.addEventListener('finish', cleanup, {once:true});
+  animation.addEventListener('cancel', cleanup, {once:true});
+}
+motionPreference.addEventListener('change', event => {
+  if (event.matches) for (const animation of activeAnimations) animation.cancel();
+  if (event.matches) document.querySelector('.startup-motion')?.remove();
+});
 const preference = matchMedia('(prefers-color-scheme: dark)');
 const themeButton = document.querySelector('#theme-toggle');
 function updateThemeButton() {
@@ -239,6 +256,7 @@ for (const button of document.querySelectorAll('[data-copy]')) {
     try {
       await navigator.clipboard.writeText(code.textContent.replace(/\n$/, ''));
       label.textContent = '已複製';
+      motionFeedback(button, [{transform:'scale(.96)'},{transform:'none'}]);
     } catch {
       const selection = window.getSelection();
       if (!selection) return;
@@ -269,6 +287,9 @@ if (lab) {
     lab.querySelector('[data-binding-a]').textContent = step.source;
     lab.querySelector('[data-binding-b]').textContent = step.target;
     lab.querySelector('[data-lab-message]').textContent = step.message;
+    const owner = step.owner === 'a' ? '[data-binding-a]' : step.owner === 'b' ? '[data-binding-b]' : null;
+    if (owner) motionFeedback(lab.querySelector(owner), [{transform:'translateX(-3px)'},{transform:'none'}]);
+    if (step.owner) motionFeedback(lab.querySelector('.memory-bytes'), [{transform:'scale(.97)'},{transform:'none'}], 300);
   });
 }
 
@@ -290,13 +311,13 @@ if (quiz) {
     feedback.dataset.result = correct ? 'correct' : 'retry';
     feedback.textContent = correct ? '答對了。下方有完整解析。' : '再試一次，或展開解析確認原因。';
     if (correct) answer.open = true;
+    motionFeedback(feedback, [{transform:'translateY(3px)'},{transform:'none'}]);
   });
 }
 
 
 // A non-modal welcome animation once per tab session. No remote resources,
 // content hiding, focus changes, or delayed navigation; no-JS pages stay intact.
-const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
 function startupMotion() {
   if (motionPreference.matches || location.hash || !document.querySelector('.hero')) return;
   try {
@@ -322,3 +343,30 @@ function startupMotion() {
   setTimeout(remove, 1400);
 }
 startupMotion();
+
+
+// Reading progress reflects actual scroll, not chapter completion. Decorative;
+// no focus or announcement changes. The content is never hidden.
+if (page.chapter) {
+  const indicator = document.createElement('div');
+  indicator.className = 'reading-indicator';
+  indicator.setAttribute('aria-hidden', 'true');
+  const fill = document.createElement('span');
+  indicator.append(fill);
+  document.body.append(indicator);
+  let pending = false;
+  const update = () => {
+    pending = false;
+    const range = Math.max(0, root.scrollHeight - innerHeight);
+    const fraction = range ? Math.min(1, Math.max(0, scrollY / range)) : 1;
+    fill.style.transform = 'scaleX(' + fraction + ')';
+  };
+  const schedule = () => {
+    if (!pending) { pending = true; requestAnimationFrame(update); }
+  };
+  addEventListener('scroll', schedule, {passive:true});
+  addEventListener('resize', schedule, {passive:true});
+  addEventListener('pageshow', schedule);
+  if ('ResizeObserver' in window) new ResizeObserver(schedule).observe(document.body);
+  update();
+}
