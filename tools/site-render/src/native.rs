@@ -460,7 +460,11 @@ impl Course {
             match lesson_check::check_file(Path::new(name)) {
                 Ok(count) => total += count,
                 Err(messages) => {
-                    errors.extend(messages.into_iter().map(|message| format!("{name}: {message}")));
+                    errors.extend(
+                        messages
+                            .into_iter()
+                            .map(|message| format!("{name}: {message}")),
+                    );
                 }
             }
         }

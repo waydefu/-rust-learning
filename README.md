@@ -33,7 +33,7 @@ npm run test:browser
 
 ## Rust 移植驗證
 
-建置器使用 Rust 的 `site-write` 建立網站輸出、複製資源並替換 `dist`；Node 原版寫入器保留在 `scripts/migration/`，只作測試對照。CI 會逐位元組比較完整網站輸出，並使用固定版本的 rust-anything v4.0.0 對獨立寫入器及完整 CLI（build/check/check-rust/dev、失敗保留產物）執行錄製及重播。Linux x86_64 可執行 `bash scripts/migration/replay-site-write.sh`；它只在暫存目錄下載經 SHA-256 驗證的工具，不變更 Agent 設定或教材工具鏈。詳見 [移植紀錄](docs/rust-port.md)。
+建置器直接呼叫 Rust 函式庫的 `site_write::write_site` 建立網站輸出、複製資源並替換 `dist`；Node 原版寫入器保留在 `scripts/migration/`，只作測試對照。CI 會逐位元組比較完整網站輸出，並使用固定版本的 rust-anything v4.0.0 對獨立寫入器及完整 CLI（build/check/check-rust/dev、失敗保留產物）執行錄製及重播。Linux x86_64 可執行 `bash scripts/migration/replay-site-write.sh`；它只在暫存目錄下載經 SHA-256 驗證的工具，不變更 Agent 設定或教材工具鏈。詳見 [移植紀錄](docs/rust-port.md)。
 
 另有獨立 CI job 在沒有 node_modules 且阻擋 node/npm/npx 的 PATH 下執行 build、check、check-rust，Pages 發布也直接使用 Rust CLI。舊版只保留為測試對照。
 
@@ -72,3 +72,5 @@ GitHub 目前可查到名稱含前導連字號的 [waydefu/-rust-learning](https
 瀏覽器入口 `src/assets/app.js` 僅負責初始化；`modules/` 分別管理共用資料、導覽搜尋、學習進度、閱讀互動、動效及概念實驗室。`site.css` 保留基礎設計及教材排版，`motion.css` 和 `concept-labs.css` 管理對應功能。所有入口與 modulepreload 由 HTML 宣告，維持原有靜態資源驗證與大小預算。
 
 Rust 工具統一使用 `tools/Cargo.toml` workspace、`tools/Cargo.lock` 與 `tools/target/`；教材的外部依賴範例維持獨立 Cargo 專案，避免教學依賴影響網站工具。
+
+正式 CLI 直接呼叫 `lesson_check`、`site_tools::search_index`、`site_tools::site_write`、`site_tools::site_preview` 函式庫；原本獨立工具的 CLI 保留作相容入口及行為重播，正式建置不再啟動子 Cargo 程序。渲染內部欄位直接傳入迭代器，只有舊版相容 stdin 介面需要 NUL 封包。

@@ -192,7 +192,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         return Err("搜尋資料超過大小限制".into());
     }
     let lessons = decode(&input)?;
-    io::stdout().lock().write_all(render(&lessons)?.as_bytes())?;
+    io::stdout()
+        .lock()
+        .write_all(render(&lessons)?.as_bytes())?;
     Ok(())
 }
 
