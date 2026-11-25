@@ -9,13 +9,15 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: site-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   verify:
     name: 教材與網站驗證
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      VERIFY_SITE_WRITE: '1'
     steps:
       - uses: actions/checkout@v6
         with:
@@ -27,31 +29,17 @@ jobs:
       - run: npm ci
       - run: npm audit --audit-level=high
       - run: rustup show
-      - run: cargo test --locked --manifest-path tools/lesson-check/Cargo.toml
-      - run: cargo test --locked --manifest-path tools/site-tools/Cargo.toml
-      - run: cargo test --locked --manifest-path tools/site-render/Cargo.toml
-      - name: Rust-anything 行為錄製與重播
-        shell: bash
-        run: bash scripts/migration/replay-site-write.sh
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: migration-replay
-          path: .migration-evidence/
-          include-hidden-files: true
-          if-no-files-found: ignore
-      - run: node scripts/migration/compare-full-app.mjs && node scripts/migration/compare-site-check.mjs
-      - name: Rust 範例執行器與原版對照
-        run: node scripts/migration/compare-examples.mjs
+      - run: cargo test --locked --workspace --manifest-path tools/Cargo.toml
+      - run: npm run test:regression
       - run: npx playwright install --with-deps chromium
-      - run: node scripts/migration/compare-full-app.mjs && node scripts/migration/compare-site-check.mjs && npm run test:browser
+      - run: npm run test:regression && npm run test:browser
         env:
           BASE_PATH: /-rust-learning/
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: full-app-evidence
-          path: .migration-evidence/full-app-*.json
+          name: approved-output-evidence
+          path: .regression-evidence/
           include-hidden-files: true
           if-no-files-found: error
       - name: 驗證 Rust 本機預覽伺服器
@@ -62,7 +50,7 @@ jobs:
         shell: bash
         run: |
           cargo build --locked --manifest-path tools/site-render/Cargo.toml
-          setsid tools/site-render/target/debug/site-render dev &
+          setsid tools/target/debug/site-render dev &
           server=$!
           trap 'kill -- -"$server" 2>/dev/null || true; wait "$server" 2>/dev/null || true' EXIT
           url="http://127.0.0.1:4173/-rust-learning"
@@ -76,6 +64,14 @@ jobs:
           test "$(curl --silent --show-error --max-time 10 --output /dev/null --write-out '%{http_code}' "$url/chapters/ownership")" = 308
           test "$(curl --silent --show-error --max-time 10 --output /dev/null --write-out '%{http_code}' "$url/not-here/")" = 404
           test "$(curl --path-as-is --silent --show-error --max-time 10 --output /dev/null --write-out '%{http_code}' "$url/%2e%2e/README.md")" = 404
+          TEST_ORIGIN="$url/" node scripts/regression/measure-mobile.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mobile-performance
+          path: .quality-evidence/mobile-performance.json
+          include-hidden-files: true
+          if-no-files-found: error
 
   native_only:
     name: 無 Node 的 Rust CLI 驗證
@@ -98,7 +94,6 @@ jobs:
           export BASE_PATH=/-rust-learning/
           cargo run --locked --manifest-path tools/site-render/Cargo.toml -- build
           cargo run --locked --manifest-path tools/site-render/Cargo.toml -- check
-          cargo run --locked --manifest-path tools/site-render/Cargo.toml -- check-rust
           test ! -d node_modules
           jq -e '.highlight.native == .highlight.total and .highlight.fallback == 0 and all(.markdown[]; .renderer == "rust")' dist/build-render-report.json
 
@@ -139,33 +134,63 @@ jobs:
       - name: 格式檢查
         shell: bash
         run: |
-          status=0
-          for crate in lesson-check site-tools site-render; do
-            cargo fmt --manifest-path "tools/$crate/Cargo.toml" -- --check || status=1
-          done
-          exit "$status"
+          cargo fmt --all --manifest-path tools/Cargo.toml -- --check
       - name: Clippy
         shell: bash
         run: |
-          status=0
-          for crate in lesson-check site-tools site-render; do
-            cargo clippy --locked --manifest-path "tools/$crate/Cargo.toml" --all-targets -- -D warnings || status=1
-          done
-          exit "$status"
+          cargo clippy --locked --workspace --manifest-path tools/Cargo.toml --all-targets -- -D warnings
       - name: RustSec 依賴掃描
         shell: bash
         run: |
           cargo +stable install --locked --version 0.23.0 cargo-audit
           status=0
-          for lock in tools/lesson-check/Cargo.lock tools/site-tools/Cargo.lock tools/site-render/Cargo.lock examples/Cargo.lock; do
+          for lock in tools/Cargo.lock examples/Cargo.lock; do
             cargo audit --file "$lock" || status=1
           done
           exit "$status"
 
+  sandbox_examples:
+    name: 隔離環境教材驗證
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: 無網路、唯讀、非 root 容器執行
+        run: bash scripts/regression/check-sandbox.sh
+
+  rust_coverage:
+    name: Rust 測試覆蓋率
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - run: rustup component add llvm-tools-preview
+      - run: cargo +stable install --locked --version 0.6.21 cargo-llvm-cov
+      - name: 單元測試與原生建置檢查覆蓋率
+        shell: bash
+        run: |
+          mkdir -p .quality-evidence
+          cargo llvm-cov --locked --workspace --manifest-path tools/Cargo.toml --no-report
+          BASE_PATH=/-rust-learning/ cargo llvm-cov run --no-report --locked --manifest-path tools/site-render/Cargo.toml -- build
+          BASE_PATH=/-rust-learning/ cargo llvm-cov run --no-report --locked --manifest-path tools/site-render/Cargo.toml -- check
+          cargo llvm-cov report --manifest-path tools/Cargo.toml --json --output-path .quality-evidence/coverage.json
+          cargo llvm-cov report --manifest-path tools/Cargo.toml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rust-coverage
+          path: .quality-evidence/coverage.json
+          include-hidden-files: true
+          if-no-files-found: error
+
   build_pages:
     name: 建置與上傳 Pages 產物
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    needs: [verify, native_only, cross_browser, rust_quality]
+    needs: [verify, native_only, cross_browser, rust_quality, sandbox_examples, rust_coverage]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

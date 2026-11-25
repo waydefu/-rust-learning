@@ -3,11 +3,7 @@
 use pulldown_cmark::{
     CodeBlockKind, CowStr, Event, HeadingLevel, Options, Parser, Tag, TagEnd, html,
 };
-use std::{
-    collections::HashMap,
-    io::{self, Read, Write},
-    process::ExitCode,
-};
+use std::{collections::HashMap, process::ExitCode};
 
 mod examples;
 mod fences;
@@ -18,10 +14,10 @@ mod native;
 mod navigation;
 mod page_data;
 mod reader;
+mod schema;
 mod site_check;
 
 type Result<T> = std::result::Result<T, String>;
-const LIMIT: u64 = 64 * 1024 * 1024;
 const KINDS: [&str; 5] = ["context", "analogy", "walkthrough", "warning", "practice"];
 const ICONS: [&str; 7] = [
     "menu", "search19", "sun", "moon", "github", "close", "search",
@@ -45,18 +41,6 @@ fn escape(value: &str) -> String {
         });
     }
     result
-}
-
-fn field<'a>(fields: &mut impl Iterator<Item = &'a str>) -> Result<&'a str> {
-    fields.next().ok_or_else(|| "渲染資料不完整".into())
-}
-
-fn count<'a>(fields: &mut impl Iterator<Item = &'a str>, max: usize) -> Result<usize> {
-    field(fields)?
-        .parse::<usize>()
-        .ok()
-        .filter(|n| *n <= max)
-        .ok_or_else(|| "渲染資料數量無效".into())
 }
 
 struct Heading<'a> {
@@ -300,113 +284,9 @@ fn layout(
     render_template(TEMPLATE, &values)
 }
 
-fn emit(out: &mut Vec<u8>, value: &str) -> Result<()> {
-    if value.contains('\0') {
-        return Err("輸出欄位包含 NUL".into());
-    }
-    out.extend_from_slice(value.as_bytes());
-    out.push(0);
-    Ok(())
-}
-
-fn process(input: &str) -> Result<Vec<u8>> {
-    let mut fields = input
-        .strip_suffix('\0')
-        .ok_or("渲染資料缺少結尾")?
-        .split('\0');
-    let mode = field(&mut fields)?;
-    let n = count(&mut fields, 1000)?;
-    let mut result = Vec::new();
-    emit(&mut result, mode)?;
-    emit(&mut result, &n.to_string())?;
-    match mode {
-        "metadata-v1" => metadata::process_metadata(n, &mut fields, &mut result)?,
-        "anchors-v1" => metadata::process_anchors(n, &mut fields, &mut result)?,
-        "navigation-v1" => navigation::process_navigation(n, &mut fields, &mut result)?,
-        "landing-v1" => landing::process_landing(n, &mut fields, &mut result)?,
-        "reader-v1" => reader::process_reader(n, &mut fields, &mut result)?,
-        "page-data-v1" => page_data::process_data(n, &mut fields, &mut result)?,
-        "highlight-v2" => highlight::process_highlight(n, &mut fields, &mut result)?,
-        "fences-v1" => fences::process_fences(n, &mut fields, &mut result)?,
-        "examples-v1" => examples::process_examples(n, &mut fields, &mut result)?,
-        "site-check-v1" => site_check::process_site_check(n, &mut fields, &mut result)?,
-        "markdown-v1" => {
-            for _ in 0..n {
-                let source = field(&mut fields)?;
-                let mut headings = Vec::new();
-                for _ in 0..count(&mut fields, 5000)? {
-                    headings.push(Heading {
-                        level: count(&mut fields, 6)? as u8,
-                        id: field(&mut fields)?,
-                    });
-                }
-                let mut fences = Vec::new();
-                for _ in 0..count(&mut fields, 5000)? {
-                    fences.push(Fence {
-                        info: field(&mut fields)?,
-                        code: field(&mut fields)?,
-                        rendered: field(&mut fields)?,
-                    });
-                }
-                match markdown(source, &headings, &fences) {
-                    Ok((intro, rest)) => {
-                        emit(&mut result, "ok")?;
-                        emit(&mut result, &intro)?;
-                        emit(&mut result, &rest)?;
-                    }
-                    Err(error) => {
-                        emit(&mut result, "error")?;
-                        emit(&mut result, &error)?;
-                        emit(&mut result, "")?;
-                    }
-                }
-            }
-        }
-        "layout-v1" => {
-            let base = field(&mut fields)?;
-            let icons = (0..ICONS.len())
-                .map(|_| field(&mut fields))
-                .collect::<Result<Vec<_>>>()?;
-            for _ in 0..n {
-                let title = field(&mut fields)?;
-                let description = field(&mut fields)?;
-                let navigation = field(&mut fields)?;
-                let body = field(&mut fields)?;
-                let data = field(&mut fields)?;
-                emit(
-                    &mut result,
-                    &layout(base, title, description, navigation, body, data, &icons)?,
-                )?;
-            }
-        }
-        _ => return Err("未知渲染介面版本".into()),
-    }
-    if fields.next().is_some() {
-        return Err("渲染資料包含多餘欄位".into());
-    }
-    Ok(result)
-}
-
-fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
-    let mut input = String::new();
-    io::stdin()
-        .lock()
-        .take(LIMIT + 1)
-        .read_to_string(&mut input)?;
-    if input.len() as u64 > LIMIT {
-        return Err("渲染資料超過 64 MiB".into());
-    }
-    io::stdout().lock().write_all(&process(&input)?)?;
-    Ok(())
-}
-
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let result = if args.is_empty() {
-        run().map_err(|e| e.to_string())
-    } else {
-        native::run(&args)
-    };
+    let result = native::run(&args);
     match result {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {

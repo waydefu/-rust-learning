@@ -1,5 +1,5 @@
 //! Extract and validate fenced examples from the original Markdown.
-use super::{Result, count, emit, field};
+use super::Result;
 use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
 
 fn name(s: &str) -> bool {
@@ -65,26 +65,6 @@ pub(super) fn extract(source: &str) -> Result<Vec<(String, String)>> {
         return Err("程式區塊不完整".into());
     }
     Ok(result)
-}
-pub(super) fn process_fences<'a>(
-    n: usize,
-    f: &mut impl Iterator<Item = &'a str>,
-    out: &mut Vec<u8>,
-) -> Result<()> {
-    for _ in 0..n {
-        let source = field(f)?;
-        let expected = count(f, 5000)?;
-        let actual = extract(source)?;
-        if actual.len() != expected {
-            return Err("程式區塊數量不同".into());
-        }
-        emit(out, &actual.len().to_string())?;
-        for (info, code) in actual {
-            emit(out, &info)?;
-            emit(out, &code)?;
-        }
-    }
-    Ok(())
 }
 #[cfg(test)]
 mod tests {

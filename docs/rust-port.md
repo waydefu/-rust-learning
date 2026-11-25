@@ -94,3 +94,19 @@ PR #12 已合併，main a51017e 的 Actions #40 首次發布成功。此 PR #13 
 PR #14 首輪 [Actions](https://github.com/waydefu/-rust-learning/actions/runs/45397395188) 的功能與跨瀏覽器驗證成功；非阻擋品質 Job 日誌指出 Rustfmt 差異、六項 Clippy 診斷，以及 RUSTSEC-2026-0433、RUSTSEC-2026-0414、RUSTSEC-2026-0592。依該版 rustfmt diff 整理原始碼並修正診斷；pulldown-cmark 升為 0.13.6、url 升為 2.5.9，依 crates.io index 更新鎖定版本與校驗值，仍須以新的 locked build、原版對照及 RustSec 驗證為準。fxhash 的 RUSTSEC-2025-0057 為無修補版本的維護性警告，經 selectors/scraper 傳遞引入；後續評估替代版本與最低 Rust 版本相容性，不隱藏警告。
 
 CI 的臨時 Cargo metadata 診斷（run 45398892481）實際產生鎖檔差異：url 2.5.9 的依賴清單新增 serde；已按該差異補齊並移除臨時 Job。正式驗證仍使用 --locked。
+
+技術債清理階段：所有現有 `rust run` 範例都宣告明確 stdout 契約（含無輸出），stderr 不計入預期輸出；程式碼中的註解不改變執行語意。新版執行器限制環境變數及輸出量並在 Unix 逾時時終止程序群組，這些是防禦措施而非安全沙箱。
+
+## PR #15：架構清理與固定參考
+
+前端改成職責分離的 ES modules 與獨立動效/實驗室樣式；Rust 工具統一 workspace，正式流程直接呼叫函式庫；移植協定只留作固定參考相容入口。依賴 scraper 0.25.0 經 Cargo 實際解析移除 fxhash。歷史 Node 原始碼移出目前工作樹，保留在已全綠的 `b2c5abe32610f6f098e46ec2501c9514fed2066d`（[Actions](https://github.com/waydefu/-rust-learning/actions/runs/45400927384)）；`scripts/regression/verify-reference.sh` 在暫存目錄取出固定參考，搭配目前 HEAD 的 Rust 工具和內容，執行原有完整產物、負例及 rust-anything 重播。另有獨立 `check-native.mjs` 驗證可重現性與拒絕無效輸入。不宣稱固定參考能證明所有未來新輸入，也不在未確認的新 CI 上宣稱通過。
+
+### 型別化原生流程
+
+導覽、首頁、閱讀頁（教材分類、測驗、流程、所有權）、頁面資料、範例報告與網站驗證均改用具名 Rust 型別和直接呼叫。歷史 stdin 協定集中到 compat.rs；舊版 adapter 仍使用相同渲染及驗證實作，不在原生流程中重新編碼或解析欄位。保留固定歷史參考、原生負例、跨瀏覽器及品質關卡。
+
+### 最終退役：固定輸出而非雙套實作
+
+從成功的 Actions 45413171553 下載 artifact 14932370146，保留兩套 51 檔完整 SHA-256 清單作核准基準。歷史 stdin 協定、Node 參考下載/執行、搜尋及寫入器遷移 CLI 全部移出目前樹；舊版歷史證據留在 Git。原生正負例、Unicode fixture、瀏覽器及逐檔雜湊持續強制驗證；所有教材程式 CI 改由獨立容器執行。基準有意變更須明確審查。
+
+最後收尾：修正自然標題與數字後綴可能產生相同 ID 的舊錨點演算法；保留 Unicode 正規化與一般重複標題行為，僅碰撞時向後尋找唯一名稱。既有 51 檔基準不變，CI 驗證原有輸出未受影響。隔離映像以成功建置的 registry digest 固定，不僅依賴版本標籤。

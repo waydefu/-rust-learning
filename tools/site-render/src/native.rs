@@ -1,51 +1,27 @@
 //! Node-independent course input, native rendering, and CLI.
-use super::{Fence, Heading, Result, callout, fences, highlight, markdown, metadata, process};
+use super::schema;
+use super::{
+    Fence, Heading, Result, callout, fences, highlight, landing, layout, markdown, metadata,
+    navigation, page_data, reader,
+};
 use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
-use serde_json::{Value, json};
+use serde::de::DeserializeOwned;
 use std::{
     collections::{BTreeMap, BTreeSet},
     env, fs,
-    io::Write,
     path::Path,
-    process::{Command, Stdio},
 };
 #[path = "native_check.rs"]
 mod check;
-type Fields = Vec<String>;
 fn fail(e: impl std::fmt::Display) -> String {
     e.to_string()
 }
 fn read(path: impl AsRef<Path>) -> Result<String> {
     fs::read_to_string(path).map_err(fail)
 }
-fn load(path: impl AsRef<Path>) -> Result<Value> {
-    serde_json::from_str(&read(path)?).map_err(fail)
-}
-fn s<'a>(v: &'a Value, key: &str) -> Result<&'a str> {
-    v.get(key)
-        .and_then(Value::as_str)
-        .ok_or_else(|| format!("缺少文字欄位 {key}"))
-}
-fn list<'a>(v: &'a Value, key: &str) -> Result<&'a [Value]> {
-    v.get(key)
-        .and_then(Value::as_array)
-        .map(Vec::as_slice)
-        .ok_or_else(|| format!("缺少清單 {key}"))
-}
-fn num(v: &Value, key: &str) -> Result<usize> {
-    v.get(key)
-        .and_then(Value::as_u64)
-        .and_then(|n| usize::try_from(n).ok())
-        .ok_or_else(|| format!("缺少數量 {key}"))
-}
-fn add(f: &mut Fields, values: &[&str]) {
-    f.extend(values.iter().map(|v| (*v).to_owned()));
-}
-fn number(f: &mut Fields, n: usize) {
-    f.push(n.to_string());
-}
-fn flag(f: &mut Fields, b: bool) {
-    f.push(b.to_string());
+fn load<T: DeserializeOwned>(path: impl AsRef<Path>) -> Result<T> {
+    let path = path.as_ref();
+    serde_json::from_str(&read(path)?).map_err(|e| format!("{}: {e}", path.display()))
 }
 fn safe_path(s: &str) -> bool {
     !s.is_empty()
@@ -65,65 +41,6 @@ fn base_path() -> Result<String> {
         return Err("BASE_PATH 必須是 / 或安全部署子路徑".into());
     }
     Ok(b)
-}
-fn framed(mode: &str, n: usize, fields: &Fields) -> Result<String> {
-    if fields.iter().any(|f| f.contains('\0')) {
-        return Err("資料含 NUL".into());
-    }
-    Ok(format!("{mode}\0{n}\0{}\0", fields.join("\0")))
-}
-fn packet(mode: &str, n: usize, fields: Fields) -> Result<Vec<String>> {
-    let raw = String::from_utf8(process(&framed(mode, n, &fields)?)?).map_err(fail)?;
-    let mut it = raw
-        .strip_suffix('\0')
-        .ok_or("原生回傳缺少結尾")?
-        .split('\0');
-    if it.next() != Some(mode) || it.next() != Some(n.to_string().as_str()) {
-        return Err("原生回傳版本不相容".into());
-    }
-    Ok(it.map(str::to_owned).collect())
-}
-fn child_tool(
-    manifest: &str,
-    bin: Option<&str>,
-    args: &[&str],
-    input: Option<&str>,
-) -> Result<String> {
-    let cargo = env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
-    let mut command = Command::new(cargo);
-    command.args(["run", "--quiet", "--locked", "--manifest-path", manifest]);
-    if let Some(bin) = bin {
-        command.args(["--bin", bin]);
-    }
-    if !args.is_empty() {
-        command.arg("--").args(args);
-    }
-    command.stderr(Stdio::inherit());
-    if let Some(input) = input {
-        let mut child = command
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .spawn()
-            .map_err(fail)?;
-        child
-            .stdin
-            .take()
-            .ok_or("無法傳遞資料")?
-            .write_all(input.as_bytes())
-            .map_err(fail)?;
-        let result = child.wait_with_output().map_err(fail)?;
-        if !result.status.success() {
-            return Err(format!("原生工具失敗：{manifest} {bin:?}"));
-        }
-        String::from_utf8(result.stdout).map_err(fail)
-    } else {
-        let status = command.status().map_err(fail)?;
-        if status.success() {
-            Ok(String::new())
-        } else {
-            Err(format!("原生工具失敗：{manifest} {bin:?}"))
-        }
-    }
 }
 #[derive(Debug)]
 struct Entry {
@@ -166,7 +83,7 @@ struct Lesson {
     full_text: String,
 }
 struct Course {
-    data: Value,
+    data: schema::SiteData,
     lessons: Vec<Lesson>,
 }
 fn source_date(s: &str) -> bool {
@@ -364,26 +281,23 @@ fn text_and_notes(source: &str) -> (String, Vec<String>) {
 }
 impl Course {
     fn load() -> Result<Self> {
-        let data = load("content/site-data.json")?;
-        let catalog = load("content/catalog.json")?;
-        let entries = catalog.as_array().ok_or("catalog 必須是清單")?;
+        let data: schema::SiteData = load("content/site-data.json")?;
+        let entries: Vec<schema::CatalogEntry> = load("content/catalog.json")?;
         if entries.is_empty() || entries.len() > 1000 {
             return Err("catalog 數量無效".into());
         }
         let mut lessons = Vec::new();
         let (mut ids, mut slugs, mut paths) = (BTreeSet::new(), BTreeSet::new(), BTreeSet::new());
         for v in entries {
-            let source = v.get("source").ok_or("教材缺少來源")?;
             let e = Entry {
-                id: s(v, "id")?.into(),
-                slug: s(v, "slug")?.into(),
-                path: s(v, "path")?.into(),
-                title: s(v, "title")?.into(),
-                description: s(v, "description")?.into(),
-                group: v.get("group").and_then(Value::as_str).unwrap_or("").into(),
-                source_id: s(source, "id")?.into(),
-                source_valid: source_date(s(source, "modified")?)
-                    && num(source, "paragraphs").is_ok(),
+                id: v.id,
+                slug: v.slug,
+                path: v.path,
+                title: v.title,
+                description: v.description,
+                group: v.group,
+                source_id: v.source.id,
+                source_valid: source_date(&v.source.modified),
             };
             if !safe_path(&e.slug)
                 || e.slug.contains('/')
@@ -433,14 +347,11 @@ impl Course {
         {
             return Err("章節及延伸教材編號不完整".into());
         }
-        let stages = result.stages()?;
-        if chapters.iter().any(|l| {
-            stages
-                .iter()
-                .filter(|st| s(st, "id").ok() == Some(l.entry.group.as_str()))
-                .count()
-                != 1
-        }) {
+        let stages = result.stages();
+        if chapters
+            .iter()
+            .any(|l| stages.iter().filter(|st| st.id == l.entry.group).count() != 1)
+        {
             return Err("教材群組不完整".into());
         }
         let files = fs::read_dir("content")
@@ -460,46 +371,54 @@ impl Course {
     fn resources(&self) -> Vec<&Lesson> {
         self.lessons.iter().filter(|l| l.entry.resource()).collect()
     }
-    fn stages(&self) -> Result<&[Value]> {
-        list(&self.data, "stages")
+    fn stages(&self) -> &[schema::Stage] {
+        &self.data.stages
     }
-    fn stage_chapters(&self, stage: &Value) -> Result<Vec<&Lesson>> {
-        let id = s(stage, "id")?;
-        Ok(self
-            .chapters()
+    fn stage_chapters(&self, stage: &schema::Stage) -> Vec<&Lesson> {
+        self.chapters()
             .into_iter()
-            .filter(|l| l.entry.group == id)
-            .collect())
+            .filter(|l| l.entry.group == stage.id)
+            .collect()
     }
     fn icon(&self, name: &str, size: usize) -> Result<String> {
         let path = self
             .data
-            .get("icons")
-            .and_then(|v| v.get(name))
-            .and_then(Value::as_str)
+            .icons
+            .get(name)
             .ok_or_else(|| format!("未知圖示 {name}"))?;
         Ok(format!(
             "<svg width=\"{size}\" height=\"{size}\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\">{path}</svg>"
         ))
     }
-    fn icons(&self, fields: &mut Fields, icons: &[(&str, usize)]) -> Result<()> {
-        for (name, size) in icons {
-            fields.push(self.icon(name, *size)?)
-        }
-        Ok(())
+    fn quiz(&self, l: &Lesson) -> Option<&schema::Quiz> {
+        self.data.quizzes.get(&l.entry.slug)
     }
-    fn quiz(&self, l: &Lesson) -> Option<&Value> {
-        self.data.get("quizzes")?.get(&l.entry.slug)
+    fn flow(&self, l: &Lesson) -> Option<&schema::Flow> {
+        self.data.flows.get(&l.entry.slug)
     }
-    fn flow(&self, l: &Lesson) -> Option<&Value> {
-        self.data.get("flows")?.get(&l.entry.slug)
+    fn ownership(&self) -> &[schema::OwnershipStep; 4] {
+        &self.data.ownership_steps
     }
-    fn ownership(&self) -> Result<&[Value]> {
-        list(&self.data, "ownershipSteps")
-    }
-    fn index(&self, base: &str) -> Value {
-        Value::Array(self.lessons.iter().map(|l|json!({"title":l.entry.title,"id":l.entry.id,"description":l.entry.description,"href":l.entry.href(base),
-        "headings":l.headings.iter().filter(|(n,_,_)|*n<=3).map(|(_,label,id)|json!({"id":id,"label":label})).collect::<Vec<_>>(),"text":l.full_text})).collect())
+    fn index(&self, base: &str) -> Vec<schema::SearchEntry> {
+        self.lessons
+            .iter()
+            .map(|l| schema::SearchEntry {
+                title: l.entry.title.clone(),
+                id: l.entry.id.clone(),
+                description: l.entry.description.clone(),
+                href: l.entry.href(base),
+                text: l.full_text.clone(),
+                headings: l
+                    .headings
+                    .iter()
+                    .filter(|(level, _, _)| *level <= 3)
+                    .map(|(_, label, id)| schema::SearchHeading {
+                        id: id.clone(),
+                        label: label.clone(),
+                    })
+                    .collect(),
+            })
+            .collect()
     }
     fn preflight(&self) -> Result<()> {
         let names: Vec<_> = self
@@ -507,12 +426,24 @@ impl Course {
             .iter()
             .map(|l| format!("content/{}.md", l.entry.slug))
             .collect();
-        child_tool(
-            "tools/lesson-check/Cargo.toml",
-            None,
-            &names.iter().map(String::as_str).collect::<Vec<_>>(),
-            None,
-        )?;
+        let mut total = 0;
+        let mut errors = Vec::new();
+        for name in &names {
+            match lesson_check::check_file(Path::new(name)) {
+                Ok(count) => total += count,
+                Err(messages) => {
+                    errors.extend(
+                        messages
+                            .into_iter()
+                            .map(|message| format!("{name}: {message}")),
+                    );
+                }
+            }
+        }
+        if !errors.is_empty() {
+            return Err(errors.join("\n"));
+        }
+        println!("Rust 教材檢查：{} 章、{total} 個教學方塊通過", names.len());
         Ok(())
     }
 }
@@ -557,113 +488,126 @@ fn pages(course: &Course) -> Vec<Page> {
     }));
     result
 }
-fn render(course: &Course, base: &str) -> Result<(Vec<(String, String)>, Value)> {
+fn render(course: &Course, base: &str) -> Result<(Vec<(String, String)>, schema::RenderReport)> {
     let chapters = course.chapters();
     let resources = course.resources();
-    let stages = course.stages()?;
+    let stages = course.stages();
     let pages = pages(course);
-    let mut fields = vec![base.to_owned(), resources.len().to_string()];
-    course.icons(
-        &mut fields,
-        &[
-            ("home", 19),
-            ("route", 19),
-            ("layers", 19),
-            ("down", 16),
-            ("check", 14),
-        ],
-    )?;
-    number(&mut fields, stages.len());
-    for stage in stages {
-        let items = course.stage_chapters(stage)?;
-        add(&mut fields, &[s(stage, "id")?, s(stage, "title")?]);
-        number(&mut fields, items.len());
-        for l in items {
-            add(&mut fields, &[&l.entry.id, &l.entry.path, &l.entry.title]);
+    let nav_icons = [
+        course.icon("home", 19)?,
+        course.icon("route", 19)?,
+        course.icon("layers", 19)?,
+        course.icon("down", 16)?,
+        course.icon("check", 14)?,
+    ];
+    let nav_icons = nav_icons.each_ref().map(String::as_str);
+    let nav_stages = stages
+        .iter()
+        .map(|stage| {
+            Ok(navigation::Stage {
+                id: &stage.id,
+                title: &stage.title,
+                chapters: course
+                    .stage_chapters(stage)
+                    .into_iter()
+                    .map(|l| navigation::Chapter {
+                        id: &l.entry.id,
+                        path: &l.entry.path,
+                        title: &l.entry.title,
+                    })
+                    .collect(),
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let nav: Vec<_> = pages
+        .iter()
+        .map(|p| {
+            navigation::navigation(
+                base,
+                &nav_stages,
+                resources.len(),
+                &nav_icons,
+                &p.current,
+                &p.id,
+            )
+        })
+        .collect();
+    let landing_icons = [
+        course.icon("chevron", 14)?,
+        course.icon("route", 18)?,
+        course.icon("book", 16)?,
+        course.icon("layers", 16)?,
+        course.icon("target", 24)?,
+        course.icon("list", 17)?,
+        course.icon("check", 15)?,
+        course.icon("chevron", 15)?,
+    ];
+    fn entry(l: &Lesson) -> landing::Entry<'_> {
+        landing::Entry {
+            id: &l.entry.id,
+            path: &l.entry.path,
+            title: &l.entry.title,
+            description: &l.entry.description,
         }
     }
-    for p in &pages {
-        add(&mut fields, &[&p.current, &p.id]);
-    }
-    let nav = packet("navigation-v1", pages.len(), fields)?;
-    let mut fields = vec![base.to_owned()];
-    course.icons(
-        &mut fields,
-        &[
-            ("chevron", 14),
-            ("route", 18),
-            ("book", 16),
-            ("layers", 16),
-            ("target", 24),
-            ("list", 17),
-            ("check", 15),
-            ("chevron", 15),
-        ],
-    )?;
-    add(
-        &mut fields,
-        &[&chapters.first().ok_or("沒有章節")?.entry.path],
-    );
-    number(&mut fields, chapters.len());
-    number(&mut fields, resources.len());
-    for l in resources {
-        let e = &l.entry;
-        add(&mut fields, &[&e.id, &e.path, &e.title, &e.description]);
-    }
-    number(&mut fields, stages.len());
-    for stage in stages {
-        let items = course.stage_chapters(stage)?;
-        add(
-            &mut fields,
-            &[
-                s(stage, "id")?,
-                s(stage, "title")?,
-                s(stage, "description")?,
-            ],
-        );
-        fields.push(course.icon(s(stage, "icon")?, 22)?);
-        number(&mut fields, items.len());
-        for l in items {
-            let e = &l.entry;
-            add(&mut fields, &[&e.id, &e.path, &e.title, &e.description]);
-            flag(&mut fields, e.slug == "ownership");
-        }
-    }
-    let mut bodies = packet("landing-v1", 3, fields)?;
-    let mut fields = vec![base.to_owned()];
-    course.icons(
-        &mut fields,
-        &[
-            ("chevron", 14),
-            ("list", 17),
-            ("check", 17),
-            ("target", 18),
-            ("layers", 17),
-            ("chevron", 16),
-        ],
-    )?;
-    number(&mut fields, stages.len());
-    for stage in stages {
-        let items = course.stage_chapters(stage)?;
-        add(&mut fields, &[s(stage, "title")?]);
-        number(&mut fields, items.len());
-        for l in items {
-            add(&mut fields, &[&l.entry.id, &l.entry.path, &l.entry.title]);
-        }
-    }
+    let landing_stages = stages
+        .iter()
+        .map(|stage| {
+            Ok(landing::Stage {
+                id: &stage.id,
+                title: &stage.title,
+                description: &stage.description,
+                icon: course.icon(&stage.icon, 22)?,
+                chapters: course
+                    .stage_chapters(stage)
+                    .into_iter()
+                    .map(|l| (entry(l), l.entry.slug == "ownership"))
+                    .collect(),
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let mut bodies = landing::render(&landing::Landing {
+        base,
+        icons: landing_icons.each_ref().map(String::as_str),
+        first: &chapters.first().ok_or("沒有章節")?.entry.path,
+        chapter_count: chapters.len(),
+        resources: resources.into_iter().map(entry).collect(),
+        stages: landing_stages,
+    })?;
+    let reader_icons = [
+        course.icon("chevron", 14)?,
+        course.icon("list", 17)?,
+        course.icon("check", 17)?,
+        course.icon("target", 18)?,
+        course.icon("layers", 17)?,
+        course.icon("chevron", 16)?,
+    ];
+    let reader_stages = stages
+        .iter()
+        .map(|stage| {
+            Ok(reader::Stage {
+                title: &stage.title,
+                chapters: course
+                    .stage_chapters(stage)
+                    .into_iter()
+                    .map(|l| reader::Chapter {
+                        id: &l.entry.id,
+                        path: &l.entry.path,
+                        title: &l.entry.title,
+                    })
+                    .collect(),
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
     let mut counts: BTreeMap<String, usize> = BTreeMap::new();
     let mut markdown_report = Vec::new();
     let copy = course.icon("copy", 16)?;
+    let mut rendered_lessons = Vec::new();
     for l in &course.lessons {
         let e = &l.entry;
-        let stage = stages
-            .iter()
-            .find(|st| s(st, "id").ok() == Some(e.group.as_str()));
-        let stage_title = stage.map(|st| s(st, "title")).transpose()?.unwrap_or("");
-        let stage_icon = course.icon(
-            stage.map(|st| s(st, "icon")).transpose()?.unwrap_or("book"),
-            17,
-        )?;
+        let stage = stages.iter().find(|st| st.id == e.group);
+        let stage_title = stage.map(|st| st.title.as_str()).unwrap_or("");
+        let stage_icon = course.icon(stage.map(|st| st.icon.as_str()).unwrap_or("book"), 17)?;
         let mut rendered = Vec::new();
         for ex in &l.examples {
             let lang = ex.info.split_whitespace().next().unwrap_or("");
@@ -695,135 +639,169 @@ fn render(course: &Course, base: &str) -> Result<(Vec<(String, String)>, Value)>
         } else {
             (String::new(), intro + &rest)
         };
-        add(&mut fields, &[&e.slug]);
-        flag(&mut fields, e.chapter());
-        flag(&mut fields, e.resource());
-        add(
-            &mut fields,
-            &[
-                &e.id,
-                &e.title,
-                &l.title,
-                &e.description,
+        rendered_lessons.push((stage_title, stage_icon, intro, rest));
+        markdown_report.push(schema::MarkdownReport {
+            slug: e.slug.clone(),
+            renderer: "rust".into(),
+            reason: String::new(),
+        });
+    }
+    let reader_lessons = course
+        .lessons
+        .iter()
+        .zip(&rendered_lessons)
+        .map(|(l, (stage_title, stage_icon, intro, rest))| {
+            let e = &l.entry;
+            let kind = if e.chapter() {
+                reader::LessonKind::Chapter
+            } else if e.resource() {
+                reader::LessonKind::Resource
+            } else {
+                reader::LessonKind::Guide
+            };
+            let ownership = if e.slug == "ownership" {
+                Some(
+                    course
+                        .ownership()
+                        .each_ref()
+                        .map(|step| (step.code.as_str(), step.message.as_str())),
+                )
+            } else {
+                None
+            };
+            let flow = course.flow(l).map(|f| reader::Flow {
+                title: &f.title,
+                caption: &f.caption,
+                nodes: f.nodes.iter().map(String::as_str).collect(),
+            });
+            let quiz = course.quiz(l).map(|q| reader::Quiz {
+                prompt: &q.prompt,
+                explanation: &q.explanation,
+                choices: q.choices.iter().map(String::as_str).collect(),
+                answer: q.answer,
+            });
+            Ok(reader::Lesson {
+                slug: &e.slug,
+                kind,
+                id: &e.id,
+                entry_title: &e.title,
+                title: &l.title,
+                description: &e.description,
                 stage_title,
-                &stage_icon,
-                &e.source_id,
-                &intro,
-                &rest,
-            ],
-        );
-        let toc: Vec<_> = l
-            .headings
-            .iter()
-            .filter(|(level, _, _)| *level == 2)
-            .collect();
-        number(&mut fields, toc.len());
-        for (_, label, id) in toc {
-            add(&mut fields, &[id, label]);
-        }
-        flag(&mut fields, e.slug == "ownership");
-        if e.slug == "ownership" {
-            for step in course.ownership()? {
-                add(&mut fields, &[s(step, "code")?, s(step, "message")?]);
-            }
-        }
-        let flow = course.flow(l);
-        flag(&mut fields, flow.is_some());
-        if let Some(f) = flow {
-            add(&mut fields, &[s(f, "title")?, s(f, "caption")?]);
-            let nodes = list(f, "nodes")?;
-            number(&mut fields, nodes.len());
-            for n in nodes {
-                add(&mut fields, &[n.as_str().ok_or("流程圖節點無效")?]);
-            }
-        }
-        let quiz = course.quiz(l);
-        flag(&mut fields, quiz.is_some());
-        if let Some(q) = quiz {
-            add(&mut fields, &[s(q, "prompt")?, s(q, "explanation")?]);
-            let choices = list(q, "choices")?;
-            number(&mut fields, choices.len());
-            number(&mut fields, num(q, "answer")?);
-            for c in choices {
-                add(&mut fields, &[c.as_str().ok_or("測驗選項無效")?]);
-            }
-        }
-        markdown_report.push(json!({"slug":e.slug,"renderer":"rust","reason":""}));
-    }
-    bodies.extend(packet("reader-v1", course.lessons.len(), fields)?);
-    let mut fields = vec![base.to_owned()];
-    number(&mut fields, chapters.len());
-    for l in chapters {
-        add(&mut fields, &[&l.entry.id, &l.entry.path]);
-    }
-    for p in &pages {
-        let l = course.lessons.iter().find(|l| l.entry.path == p.current);
-        let chapter = l
-            .filter(|l| l.entry.chapter())
-            .map(|l| l.entry.id.as_str())
-            .unwrap_or("");
-        let ownership = l.is_some_and(|l| l.entry.slug == "ownership");
-        add(&mut fields, &[chapter]);
-        flag(&mut fields, ownership);
-        if ownership {
-            let steps = course.ownership()?;
-            number(&mut fields, steps.len());
-            for step in steps {
-                add(
-                    &mut fields,
-                    &[
-                        s(step, "code")?,
-                        s(step, "source")?,
-                        s(step, "target")?,
-                        step.get("owner").and_then(Value::as_str).unwrap_or(""),
-                    ],
-                );
-                fields.push(
-                    step.get("borrowed")
-                        .and_then(Value::as_bool)
-                        .map(|b| b.to_string())
-                        .unwrap_or_default(),
-                );
-                add(&mut fields, &[s(step, "message")?]);
-            }
-        }
-        fields.push(
-            l.and_then(|l| course.quiz(l))
-                .map(|q| num(q, "answer").map(|v| v.to_string()))
-                .transpose()?
-                .unwrap_or_default(),
-        );
-    }
-    let data = packet("page-data-v1", pages.len(), fields)?;
+                label_icon: stage_icon,
+                source_id: &e.source_id,
+                intro,
+                rest,
+                toc: l
+                    .headings
+                    .iter()
+                    .filter(|(level, _, _)| *level == 2)
+                    .map(|(_, label, id)| (id.as_str(), label.as_str()))
+                    .collect(),
+                ownership,
+                flow,
+                quiz,
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    bodies.extend(reader::render(
+        base,
+        reader_icons.each_ref().map(String::as_str),
+        &reader_stages,
+        &reader_lessons,
+    )?);
+    let paths: Vec<_> = chapters
+        .iter()
+        .map(|l| (l.entry.id.as_str(), l.entry.path.as_str()))
+        .collect();
+    let data = pages
+        .iter()
+        .map(|p| {
+            let l = course.lessons.iter().find(|l| l.entry.path == p.current);
+            let chapter = l.filter(|l| l.entry.chapter()).map(|l| l.entry.id.as_str());
+            let ownership = if l.is_some_and(|l| l.entry.slug == "ownership") {
+                Some(
+                    course
+                        .ownership()
+                        .iter()
+                        .map(|step| page_data::OwnershipStep {
+                            code: &step.code,
+                            source: &step.source,
+                            target: &step.target,
+                            owner: step.owner.as_deref().filter(|v| !v.is_empty()),
+                            borrowed: step.borrowed,
+                            message: &step.message,
+                        })
+                        .collect(),
+                )
+            } else {
+                None
+            };
+            let answer = l.and_then(|l| course.quiz(l)).map(|q| q.answer);
+            Ok(page_data::render(
+                base,
+                &paths,
+                &page_data::PageData {
+                    chapter,
+                    ownership,
+                    answer,
+                },
+            ))
+        })
+        .collect::<Result<Vec<_>>>()?;
     if nav.len() != pages.len() || bodies.len() != pages.len() || data.len() != pages.len() {
         return Err("頁面數量不相容".into());
     }
-    let mut fields = vec![base.to_owned()];
-    course.icons(
-        &mut fields,
-        &[
-            ("menu", 20),
-            ("search", 19),
-            ("sun", 20),
-            ("moon", 20),
-            ("github", 20),
-            ("close", 20),
-            ("search", 20),
-        ],
-    )?;
-    for (i, p) in pages.iter().enumerate() {
-        add(
-            &mut fields,
-            &[&p.title, &p.description, &nav[i], &bodies[i], &data[i]],
-        );
-    }
-    let html = packet("layout-v1", pages.len(), fields)?;
+    let icons = [
+        course.icon("menu", 20)?,
+        course.icon("search", 19)?,
+        course.icon("sun", 20)?,
+        course.icon("moon", 20)?,
+        course.icon("github", 20)?,
+        course.icon("close", 20)?,
+        course.icon("search", 20)?,
+    ];
+    let icons = icons.each_ref().map(String::as_str);
+    let html = pages
+        .iter()
+        .enumerate()
+        .map(|(i, p)| {
+            layout(
+                base,
+                &p.title,
+                &p.description,
+                &nav[i],
+                &bodies[i],
+                &data[i],
+                &icons,
+            )
+        })
+        .collect::<Result<Vec<_>>>()?;
     let total: usize = counts.values().sum();
     let by_language: BTreeMap<_, _> = counts
         .into_iter()
-        .map(|(k, n)| (k, json!({"native":n,"total":n})))
+        .map(|(k, n)| {
+            (
+                k,
+                schema::LanguageCount {
+                    native: n,
+                    total: n,
+                },
+            )
+        })
         .collect();
-    let report = json!({"layout":"rust","pages":pages.len(),"markdown":markdown_report,"highlight":{"renderer":"rust","native":total,"total":total,"fallback":0,"byLanguage":by_language}});
+    let report = schema::RenderReport {
+        layout: "rust".into(),
+        pages: pages.len(),
+        markdown: markdown_report,
+        highlight: schema::HighlightReport {
+            renderer: "rust".into(),
+            native: total,
+            total,
+            fallback: 0,
+            by_language,
+        },
+    };
     Ok((
         pages
             .into_iter()
@@ -836,24 +814,29 @@ fn render(course: &Course, base: &str) -> Result<(Vec<(String, String)>, Value)>
 fn build(course: &Course, base: &str) -> Result<()> {
     course.preflight()?;
     let (mut output, report) = render(course, base)?;
-    let mut fields = Vec::new();
-    for l in &course.lessons {
-        let e = &l.entry;
-        add(
-            &mut fields,
-            &[&e.title, &e.id, &e.description, &e.href(base), &l.full_text],
-        );
-        number(&mut fields, l.headings.len());
-        for (level, label, id) in &l.headings {
-            add(&mut fields, &[id, label, &level.to_string()]);
-        }
-    }
-    let search = child_tool(
-        "tools/site-tools/Cargo.toml",
-        Some("search-index"),
-        &[],
-        Some(&framed("rust-search-v1", course.lessons.len(), &fields)?),
-    )?;
+    let hrefs: Vec<_> = course.lessons.iter().map(|l| l.entry.href(base)).collect();
+    let lessons: Vec<_> = course
+        .lessons
+        .iter()
+        .zip(&hrefs)
+        .map(|(l, href)| site_tools::search_index::Lesson {
+            title: &l.entry.title,
+            id: &l.entry.id,
+            description: &l.entry.description,
+            href,
+            text: &l.full_text,
+            headings: l
+                .headings
+                .iter()
+                .map(|(level, label, id)| site_tools::search_index::Heading {
+                    id,
+                    label,
+                    level: *level,
+                })
+                .collect(),
+        })
+        .collect();
+    let search = site_tools::search_index::render(&lessons)?;
     output.extend([
         (".nojekyll".into(), String::new()),
         ("assets/search-index.json".into(), search),
@@ -866,16 +849,11 @@ fn build(course: &Course, base: &str) -> Result<()> {
             serde_json::to_string_pretty(&report).map_err(fail)?,
         ),
     ]);
-    let fields = output
+    let files: Vec<_> = output
         .iter()
-        .flat_map(|(p, s)| [p.clone(), s.clone()])
+        .map(|(path, text)| (path.as_str(), text.as_str()))
         .collect();
-    child_tool(
-        "tools/site-tools/Cargo.toml",
-        Some("site-write"),
-        &[],
-        Some(&framed("site-write-v1", output.len(), &fields)?),
-    )?;
+    site_tools::site_write::write_site(Path::new("."), &files).map_err(fail)?;
     println!(
         "Built {} HTML pages at {base} (Rust CLI, no Node)",
         pages(course).len()
@@ -883,28 +861,29 @@ fn build(course: &Course, base: &str) -> Result<()> {
     Ok(())
 }
 fn check_examples(course: &Course) -> Result<()> {
-    let mut fields = Vec::new();
-    for l in &course.lessons {
-        add(&mut fields, &[&l.entry.slug]);
-        number(&mut fields, l.examples.len());
-        for e in &l.examples {
-            number(&mut fields, e.line);
-            add(&mut fields, &[&e.info, &e.code]);
-        }
-    }
-    let output = packet("examples-v1", course.lessons.len(), fields)?;
-    if output.len() < 6 {
-        return Err("範例執行器結果不完整".into());
-    }
-    let n = |i: usize| output[i].parse::<usize>().map_err(fail);
-    let (compiled, run, error, project, messages) = (n(1)?, n(2)?, n(3)?, n(4)?, n(5)?);
-    if output.len() != 6 + messages {
-        return Err("範例訊息不完整".into());
-    }
-    println!("{}", output[0]);
-    for message in &output[6..] {
+    let lessons: Vec<_> = course
+        .lessons
+        .iter()
+        .map(|lesson| super::examples::Lesson {
+            slug: &lesson.entry.slug,
+            examples: lesson
+                .examples
+                .iter()
+                .map(|example| super::examples::Example {
+                    line: example.line,
+                    info: &example.info,
+                    source: &example.code,
+                })
+                .collect(),
+        })
+        .collect();
+    let report = super::examples::check(&lessons)?;
+    println!("{}", report.version);
+    for message in &report.messages {
         println!("{message}");
     }
+    let (compiled, run, error, project) =
+        (report.compiled, report.run, report.error, report.project);
     println!(
         "Rust 區塊通過 {} 段（獨立編譯 {compiled} 段，其中 {run} 段執行或執行測試，預期診斷 {error} 段，Cargo 專案 {project} 段）",
         compiled + error + project
@@ -930,13 +909,7 @@ pub(super) fn run(args: &[String]) -> Result<()> {
         "dev" => {
             build(&course, &base)?;
             check::check(&course, &base)?;
-            child_tool(
-                "tools/site-tools/Cargo.toml",
-                Some("site-preview"),
-                &["dist"],
-                None,
-            )
-            .map(|_| ())
+            site_tools::site_preview::serve(Path::new("dist")).map_err(fail)
         }
         _ => Err("未知指令；請使用 build、check、check-rust 或 dev".into()),
     }

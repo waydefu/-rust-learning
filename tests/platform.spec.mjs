@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { stat } from 'node:fs/promises';
 import { join } from 'node:path';
-import { projectRoot } from '../src/course.mjs';
+import { projectRoot } from './support/course.mjs';
 
 const origin = 'https://rust-learning.test';
 const base = '/-rust-learning/';
@@ -254,4 +254,17 @@ test('iterator laziness and Rc reference count are observable', async ({page}) =
   await lab.getByRole('button',{name:'drop 一個 Rc'}).click();
   await expect(lab.getByRole('status')).toContainText('內容被清理');
   await expect(lab.getByRole('button',{name:'Rc::clone'})).toBeDisabled();
+});
+
+
+test('all frontend module dependencies are explicitly declared and load', async ({page}) => {
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto(target('chapters/ownership/'));
+  await expect(page.getByRole('button',{name:'搜尋教材'})).toBeVisible();
+  await expect(page.locator('[data-steps]')).toBeVisible();
+  const paths = await page.locator('link[rel="modulepreload"]').evaluateAll(links =>
+    links.map(link => new URL(link.href).pathname.split('/').at(-1)).sort());
+  expect(paths).toEqual(['concept-labs.js','context.js','motion.js','navigation.js','progress.js','reader.js']);
+  expect(errors).toEqual([]);
 });

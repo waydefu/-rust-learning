@@ -43,78 +43,56 @@ fn decode_fragment(s: &str) -> Result<String> {
     }
     String::from_utf8(bytes).map_err(fail)
 }
-fn send_index(fields: &mut Fields, v: &Value) -> Result<()> {
-    let entries = v.as_array().ok_or("搜尋索引非清單")?;
-    number(fields, entries.len());
-    for e in entries {
-        add(
-            fields,
-            &[
-                s(e, "title")?,
-                s(e, "id")?,
-                s(e, "description")?,
-                s(e, "href")?,
-                s(e, "text")?,
-            ],
-        );
-        let headings = list(e, "headings")?;
-        number(fields, headings.len());
-        for h in headings {
-            add(fields, &[s(h, "id")?, s(h, "label")?]);
-        }
-    }
-    Ok(())
-}
-fn index_shape(v: &Value) -> bool {
-    v.as_array().is_some_and(|a| {
-        a.iter().all(|e| {
-            e.as_object().is_some_and(|o| o.len() == 6)
-                && ["title", "id", "description", "href", "text"]
-                    .iter()
-                    .all(|k| s(e, k).is_ok())
-                && list(e, "headings").is_ok_and(|h| {
-                    h.iter().all(|h| {
-                        h.as_object().is_some_and(|o| o.len() == 2)
-                            && s(h, "id").is_ok()
-                            && s(h, "label").is_ok()
-                    })
-                })
+fn typed_index(v: &[schema::SearchEntry]) -> Vec<super::super::site_check::IndexEntry<'_>> {
+    use super::super::site_check::IndexEntry;
+    v.iter()
+        .map(|e| IndexEntry {
+            title: &e.title,
+            id: &e.id,
+            description: &e.description,
+            href: &e.href,
+            text: &e.text,
+            headings: e
+                .headings
+                .iter()
+                .map(|h| (h.id.as_str(), h.label.as_str()))
+                .collect(),
         })
-    })
+        .collect()
 }
 pub(super) fn check(course: &Course, base: &str) -> Result<()> {
     let root = Path::new("dist");
-    let mut fields = vec![base.to_owned(), course.lessons.len().to_string()];
-    for l in &course.lessons {
-        let e = &l.entry;
-        add(&mut fields, &[&e.id, &e.slug, &e.path]);
-        flag(&mut fields, e.chapter());
-        flag(&mut fields, e.resource());
-        number(
-            &mut fields,
-            course
-                .stages()?
-                .iter()
-                .filter(|st| s(st, "id").ok() == Some(e.group.as_str()))
-                .count(),
-        );
-        add(&mut fields, &[&e.source_id]);
-        flag(&mut fields, e.source_valid);
-        number(&mut fields, l.headings.len());
-        for (level, label, _) in &l.headings {
-            number(&mut fields, *level as usize);
-            add(&mut fields, &[label]);
-        }
-        number(&mut fields, l.examples.len());
-        for ex in &l.examples {
-            number(&mut fields, ex.line);
-            add(&mut fields, &[&ex.markup, &ex.ending]);
-        }
-        number(&mut fields, l.notes.len());
-        for note in &l.notes {
-            add(&mut fields, &[note]);
-        }
-    }
+    use super::super::site_check;
+    let stages = course.stages();
+    let lessons = course
+        .lessons
+        .iter()
+        .map(|l| {
+            let e = &l.entry;
+            site_check::Lesson {
+                id: &e.id,
+                slug: &e.slug,
+                path: &e.path,
+                chapter: e.chapter(),
+                resource: e.resource(),
+                stage_count: stages.iter().filter(|st| st.id == e.group).count(),
+                source_id: &e.source_id,
+                source_valid: e.source_valid,
+                headings: l
+                    .headings
+                    .iter()
+                    .map(|(level, label, _)| (*level as usize, label.as_str()))
+                    .collect(),
+                fences: l
+                    .examples
+                    .iter()
+                    .map(|ex| (ex.line, ex.markup.as_str(), ex.ending.as_str()))
+                    .collect(),
+                notes: l.notes.iter().map(String::as_str).collect(),
+            }
+        })
+        .collect();
+    let mut pages = Vec::new();
     let mut names = Vec::new();
     html_files(root, root, &mut names)?;
     names.sort();
@@ -132,53 +110,40 @@ pub(super) fn check(course: &Course, base: &str) -> Result<()> {
         let route = format!("{base}{suffix}");
         let html = Html::parse_document(&read(root.join(name))?);
         let nodes: Vec<_> = html.select(&all).collect();
-        let ids: Vec<_> = nodes
+        let ids = nodes
             .iter()
             .filter_map(|n| n.value().attr("id"))
             .filter(|s| !s.is_empty())
+            .map(str::to_owned)
             .collect();
-        add(&mut fields, &[&route]);
-        number(
-            &mut fields,
-            nodes.iter().filter(|n| n.value().name() == "h1").count(),
-        );
-        number(
-            &mut fields,
-            nodes.iter().filter(|n| n.value().name() == "main").count(),
-        );
-        add(
-            &mut fields,
-            &[html.root_element().value().attr("lang").unwrap_or("")],
-        );
-        number(
-            &mut fields,
-            nodes
-                .iter()
-                .filter(|n| n.value().name() == "img" && n.value().attr("alt").is_none())
-                .count(),
-        );
-        number(&mut fields, ids.len());
-        add(&mut fields, &ids);
-        let notes: Vec<_> = nodes
+        let h1 = nodes.iter().filter(|n| n.value().name() == "h1").count();
+        let main = nodes.iter().filter(|n| n.value().name() == "main").count();
+        let lang = html
+            .root_element()
+            .value()
+            .attr("lang")
+            .unwrap_or("")
+            .to_owned();
+        let missing_alt = nodes
+            .iter()
+            .filter(|n| n.value().name() == "img" && n.value().attr("alt").is_none())
+            .count();
+        let notes = nodes
             .iter()
             .filter(|n| n.value().attr("data-callout").is_some())
+            .map(|note| {
+                let title = note
+                    .select(&note_title)
+                    .find(|t| t.value().attr("class") == Some("callout-title"))
+                    .map(|t| t.text().collect::<String>())
+                    .unwrap_or_default();
+                site_check::Note {
+                    kind: note.value().attr("data-callout").unwrap_or("").to_owned(),
+                    role: note.value().attr("role").unwrap_or("").to_owned(),
+                    title: title.trim().to_owned(),
+                }
+            })
             .collect();
-        number(&mut fields, notes.len());
-        for note in notes {
-            let title = note
-                .select(&note_title)
-                .find(|t| t.value().attr("class") == Some("callout-title"))
-                .map(|t| t.text().collect::<String>())
-                .unwrap_or_default();
-            add(
-                &mut fields,
-                &[
-                    note.value().attr("data-callout").unwrap_or(""),
-                    note.value().attr("role").unwrap_or(""),
-                    title.trim(),
-                ],
-            );
-        }
         let mut links = Vec::new();
         let page = origin.join(&route).map_err(fail)?;
         for node in nodes {
@@ -194,50 +159,55 @@ pub(super) fn check(course: &Course, base: &str) -> Result<()> {
             if target.origin() != origin.origin() {
                 continue;
             }
-            links.push((
-                address.to_owned(),
-                target.path().to_owned(),
-                decode_fragment(target.fragment().unwrap_or(""))?,
-            ));
+            links.push(site_check::Link {
+                address: address.to_owned(),
+                path: target.path().to_owned(),
+                hash: decode_fragment(target.fragment().unwrap_or(""))?,
+            });
         }
-        number(&mut fields, links.len());
-        for (address, path, hash) in links {
-            add(&mut fields, &[&address, &path, &hash]);
-        }
+        pages.push(site_check::Page {
+            route,
+            h1,
+            main,
+            lang,
+            missing_alt,
+            ids,
+            notes,
+            links,
+        });
     }
-    let report = load(root.join("build-render-report.json"))?;
-    add(&mut fields, &[s(&report, "layout")?]);
-    number(&mut fields, num(&report, "pages")?);
-    let md = list(&report, "markdown")?;
-    number(&mut fields, md.len());
-    for item in md {
-        add(&mut fields, &[s(item, "slug")?, s(item, "renderer")?]);
-    }
-    let high = report.get("highlight").ok_or("缺少高亮報告")?;
-    add(&mut fields, &[s(high, "renderer")?]);
-    for k in ["native", "total", "fallback"] {
-        number(&mut fields, num(high, k)?);
-    }
-    let index = load(root.join("assets/search-index.json"))?;
-    let shape = index_shape(&index);
-    flag(&mut fields, shape);
-    send_index(&mut fields, &course.index(base))?;
-    if shape {
-        send_index(&mut fields, &index)?
-    } else {
-        number(&mut fields, 0);
-    }
-    let result = packet("site-check-v1", names.len(), fields)?;
-    if result.len() != 4 {
-        return Err("網站驗證回傳不完整".into());
-    }
-    let bytes = result[3].parse::<u64>().map_err(fail)?;
+    let report: schema::RenderReport = load(root.join("build-render-report.json"))?;
+    let high = &report.highlight;
+    let render_report = site_check::RenderReport {
+        layout: &report.layout,
+        pages: report.pages,
+        markdown: report
+            .markdown
+            .iter()
+            .map(|item| (item.slug.as_str(), item.renderer.as_str()))
+            .collect(),
+        renderer: &high.renderer,
+        native: high.native,
+        total: high.total,
+        fallback: high.fallback,
+    };
+    let index = load::<Vec<schema::SearchEntry>>(root.join("assets/search-index.json"));
+    let expected_index = course.index(base);
+    let summary = site_check::verify(&site_check::Input {
+        base,
+        lessons,
+        pages,
+        report: render_report,
+        shape_valid: index.is_ok(),
+        expected_index: typed_index(&expected_index),
+        index: index.as_ref().map(|v| typed_index(v)).unwrap_or_default(),
+    })?;
     println!(
         "{} 份 Markdown、{} 個 HTML、{} 個站內引用與搜尋索引通過，首頁與共用資源 {:.1} kB（未壓縮），BASE_PATH={base}",
-        result[0],
-        result[1],
-        result[2],
-        bytes as f64 / 1000.0
+        summary.lessons,
+        summary.pages,
+        summary.links,
+        summary.bytes as f64 / 1000.0
     );
     Ok(())
 }

@@ -1,7 +1,7 @@
 //! Stable heading metadata: preserve the existing JavaScript anchor contract.
-use super::{Result, count, emit, field};
+use super::Result;
 use pulldown_cmark::{Event, Options, Parser, Tag, TagEnd};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use unicode_general_category::{GeneralCategory as G, get_general_category};
 use unicode_normalization::UnicodeNormalization;
 
@@ -41,16 +41,22 @@ fn stem(label: &str) -> String {
 }
 fn anchors<'a>(labels: impl IntoIterator<Item = &'a str>) -> Vec<String> {
     let mut seen = HashMap::new();
+    let mut used = HashSet::new();
     labels
         .into_iter()
         .map(|label| {
             let stem = stem(label);
             let n = seen.entry(stem.clone()).or_insert(0usize);
-            *n += 1;
-            if *n == 1 {
-                format!("s-{stem}")
-            } else {
-                format!("s-{stem}-{n}")
+            loop {
+                *n += 1;
+                let candidate = if *n == 1 {
+                    format!("s-{stem}")
+                } else {
+                    format!("s-{stem}-{n}")
+                };
+                if used.insert(candidate.clone()) {
+                    break candidate;
+                }
             }
         })
         .collect()
@@ -102,40 +108,6 @@ pub(super) fn headings(source: &str) -> Result<HeadingMetadata> {
             .collect(),
     ))
 }
-pub(super) fn process_metadata<'a>(
-    n: usize,
-    fields: &mut impl Iterator<Item = &'a str>,
-    out: &mut Vec<u8>,
-) -> Result<()> {
-    for _ in 0..n {
-        let (title, headings) = headings(field(fields)?)?;
-        emit(out, &title)?;
-        emit(out, &headings.len().to_string())?;
-        for (level, label, id) in headings {
-            emit(out, &level.to_string())?;
-            emit(out, &label)?;
-            emit(out, &id)?;
-        }
-    }
-    Ok(())
-}
-pub(super) fn process_anchors<'a>(
-    n: usize,
-    fields: &mut impl Iterator<Item = &'a str>,
-    out: &mut Vec<u8>,
-) -> Result<()> {
-    for _ in 0..n {
-        let labels = (0..count(fields, 5000)?)
-            .map(|_| field(fields))
-            .collect::<Result<Vec<_>>>()?;
-        let ids = anchors(labels);
-        emit(out, &ids.len().to_string())?;
-        for id in ids {
-            emit(out, &id)?;
-        }
-    }
-    Ok(())
-}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -165,6 +137,94 @@ mod tests {
         );
         assert_eq!(stem("a\u{345}b"), "a-b");
     }
+    #[test]
+    fn unicode_anchor_contract_and_suffix_collision_guards() {
+        assert_eq!(
+            anchors([
+                "ＡＢＣ ①",
+                "abc 1",
+                "繁體中文—Rust",
+                "🦀",
+                "",
+                "É",
+                "e\u{301}",
+                "ΟΣ",
+                "İ",
+                "a\u{345}b",
+                "Ⅳ",
+                "𐐀"
+            ]),
+            [
+                "s-abc-1",
+                "s-abc-1-2",
+                "s-繁體中文-rust",
+                "s-section",
+                "s-section-2",
+                "s-é",
+                "s-é-2",
+                "s-ος",
+                "s-i",
+                "s-a-b",
+                "s-iv",
+                "s-𐐨"
+            ]
+        );
+        assert_eq!(
+            anchors([
+                "a",
+                "a",
+                "a-2",
+                "a",
+                "a-2",
+                "---",
+                "😄",
+                "C++",
+                "C#",
+                "你好 世界",
+                "\tHello\nWorld"
+            ]),
+            [
+                "s-a",
+                "s-a-2",
+                "s-a-2-2",
+                "s-a-3",
+                "s-a-2-3",
+                "s-section",
+                "s-section-2",
+                "s-c",
+                "s-c-2",
+                "s-你好-世界",
+                "s-hello-world"
+            ]
+        );
+        assert_eq!(
+            anchors([
+                "مرحبا",
+                "हिन्दी",
+                "カタカナ",
+                "ｶﾀｶﾅ",
+                "中文",
+                "中文",
+                "０９",
+                "ﬃ",
+                "Ⅷ"
+            ]),
+            [
+                "s-مرحبا",
+                "s-ह-न-द",
+                "s-カタカナ",
+                "s-カタカナ-2",
+                "s-中文",
+                "s-中文-2",
+                "s-09",
+                "s-ffi",
+                "s-viii"
+            ]
+        );
+        assert!(anchors([]).is_empty());
+        assert_eq!(anchors(["a-2", "a", "a"]), ["s-a-2", "s-a", "s-a-3"]);
+    }
+
     #[test]
     fn extracts_title_and_duplicate_headings() {
         let (title, h) =

@@ -1,22 +1,11 @@
 //! Site verification over normalized HTML and URL facts from the HTML5 parser.
-//! Rust owns the rules, filesystem checks and final counts; the bridge does not
-//! substitute a partial HTML parser for parse5 or WHATWG URL semantics.
-use super::{Result, count, emit, field};
+//! The native collector and the historical adapter share one typed verifier.
+use super::Result;
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
     path::{Component, Path},
 };
-fn flag<'a>(f: &mut impl Iterator<Item = &'a str>) -> Result<bool> {
-    match field(f)? {
-        "true" => Ok(true),
-        "false" => Ok(false),
-        _ => Err("網站驗證旗標無效".into()),
-    }
-}
-fn strings<'a>(f: &mut impl Iterator<Item = &'a str>, limit: usize) -> Result<Vec<&'a str>> {
-    (0..count(f, limit)?).map(|_| field(f)).collect()
-}
 fn unique<T: Ord>(values: &[T]) -> bool {
     values.iter().collect::<BTreeSet<_>>().len() == values.len()
 }
@@ -37,26 +26,62 @@ fn file_size(root: &Path, name: &str) -> Option<u64> {
     let m = fs::metadata(path).ok()?;
     if m.is_file() { Some(m.len()) } else { None }
 }
-struct Note<'a> {
-    kind: &'a str,
-    role: &'a str,
-    title: &'a str,
+pub(super) struct Note {
+    pub kind: String,
+    pub role: String,
+    pub title: String,
 }
-struct Link<'a> {
-    address: &'a str,
-    path: &'a str,
-    hash: &'a str,
+pub(super) struct Link {
+    pub address: String,
+    pub path: String,
+    pub hash: String,
 }
-struct Page<'a> {
-    ids: Vec<&'a str>,
-    notes: Vec<Note<'a>>,
-    links: Vec<Link<'a>>,
+pub(super) struct Page {
+    pub route: String,
+    pub h1: usize,
+    pub main: usize,
+    pub lang: String,
+    pub missing_alt: usize,
+    pub ids: Vec<String>,
+    pub notes: Vec<Note>,
+    pub links: Vec<Link>,
 }
-struct Lesson<'a> {
-    slug: &'a str,
-    route: String,
-    chapter: bool,
-    notes: Vec<&'a str>,
+pub(super) struct Lesson<'a> {
+    pub id: &'a str,
+    pub slug: &'a str,
+    pub path: &'a str,
+    pub chapter: bool,
+    pub resource: bool,
+    pub stage_count: usize,
+    pub source_id: &'a str,
+    pub source_valid: bool,
+    pub headings: Vec<(usize, &'a str)>,
+    pub fences: Vec<(usize, &'a str, &'a str)>,
+    pub notes: Vec<&'a str>,
+}
+pub(super) struct RenderReport<'a> {
+    pub layout: &'a str,
+    pub pages: usize,
+    pub markdown: Vec<(&'a str, &'a str)>,
+    pub renderer: &'a str,
+    pub native: usize,
+    pub total: usize,
+    pub fallback: usize,
+}
+pub(super) struct Input<'a> {
+    pub base: &'a str,
+    pub lessons: Vec<Lesson<'a>>,
+    pub pages: Vec<Page>,
+    pub report: RenderReport<'a>,
+    pub shape_valid: bool,
+    pub expected_index: Vec<IndexEntry<'a>>,
+    pub index: Vec<IndexEntry<'a>>,
+}
+pub(super) struct Summary {
+    pub lessons: usize,
+    pub pages: usize,
+    pub links: usize,
+    pub bytes: u64,
 }
 fn check_note(title: &str, role: &str) -> bool {
     role == "note"
@@ -69,65 +94,26 @@ fn check_note(title: &str, role: &str) -> bool {
 }
 
 #[derive(PartialEq, Eq)]
-struct IndexEntry<'a> {
-    title: &'a str,
-    id: &'a str,
-    description: &'a str,
-    href: &'a str,
-    text: &'a str,
-    headings: Vec<(&'a str, &'a str)>,
-}
-fn read_index<'a>(f: &mut impl Iterator<Item = &'a str>) -> Result<Vec<IndexEntry<'a>>> {
-    let mut entries = Vec::new();
-    for _ in 0..count(f, 1000)? {
-        let [title, id, description, href, text] =
-            [field(f)?, field(f)?, field(f)?, field(f)?, field(f)?];
-        let mut headings = Vec::new();
-        for _ in 0..count(f, 5000)? {
-            headings.push((field(f)?, field(f)?));
-        }
-        entries.push(IndexEntry {
-            title,
-            id,
-            description,
-            href,
-            text,
-            headings,
-        });
-    }
-    Ok(entries)
+pub(super) struct IndexEntry<'a> {
+    pub title: &'a str,
+    pub id: &'a str,
+    pub description: &'a str,
+    pub href: &'a str,
+    pub text: &'a str,
+    pub headings: Vec<(&'a str, &'a str)>,
 }
 
-pub(super) fn process_site_check<'a>(
-    n: usize,
-    f: &mut impl Iterator<Item = &'a str>,
-    out: &mut Vec<u8>,
-) -> Result<()> {
-    let base = field(f)?;
-    if !base.starts_with('/')
-        || !base.ends_with('/')
-        || base.starts_with("//")
-        || !base
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b"/_.-".contains(&b))
-        || base.split('/').any(|p| matches!(p, "." | ".."))
-    {
-        return Err("BASE_PATH 無效".into());
-    }
+pub(super) fn verify(input: &Input<'_>) -> Result<Summary> {
+    let base = input.base;
     let mut errors = Vec::new();
     let mut total_fences = 0usize;
-    let mut lessons = Vec::new();
     let (mut ids, mut slugs, mut paths) = (Vec::new(), Vec::new(), Vec::new());
     let (mut chapter_ids, mut resource_ids) = (Vec::new(), Vec::new());
-    for _ in 0..count(f, 1000)? {
-        let id = field(f)?;
-        let slug = field(f)?;
-        let path = field(f)?;
-        let chapter = flag(f)?;
-        let resource = flag(f)?;
-        let stage_count = count(f, 100)?;
-        let source_id = field(f)?;
-        let source_valid = flag(f)?;
+    for l in &input.lessons {
+        let (id, slug, path) = (l.id, l.slug, l.path);
+        let (chapter, resource) = (l.chapter, l.resource);
+        let stage_count = l.stage_count;
+        let (source_id, source_valid) = (l.source_id, l.source_valid);
         ids.push(id);
         slugs.push(slug);
         paths.push(path);
@@ -151,25 +137,20 @@ pub(super) fn process_site_check<'a>(
         {
             errors.push(format!("{slug} 缺少有效的來源記錄"));
         }
-        let heading_count = count(f, 5000)?;
+        let heading_count = l.headings.len();
         if heading_count == 0 {
             errors.push(format!("{slug} 缺少內容標題"))
         }
         let mut level = 1;
-        for _ in 0..heading_count {
-            let next = count(f, 6)?;
-            let label = field(f)?;
+        for &(next, label) in &l.headings {
             if next > level + 1 {
                 errors.push(format!("{slug} 標題層級跳躍 {label}"))
             }
             level = next;
         }
-        let fence_count = count(f, 5000)?;
-        total_fences += fence_count;
-        for _ in 0..fence_count {
-            let line = count(f, 1_000_000)?;
-            let markup = field(f)?;
-            let ending = field(f)?.trim();
+        total_fences += l.fences.len();
+        for &(line, markup, ending) in &l.fences {
+            let ending = ending.trim();
             if markup.is_empty()
                 || !ending.starts_with(markup)
                 || !ending.chars().all(|c| markup.starts_with(c))
@@ -177,13 +158,6 @@ pub(super) fn process_site_check<'a>(
                 errors.push(format!("{slug}.md:{line} 缺少程式碼結尾"));
             }
         }
-        let notes = strings(f, 5000)?;
-        lessons.push(Lesson {
-            slug,
-            route: format!("{base}{path}/"),
-            chapter,
-            notes,
-        });
     }
     if chapter_ids.len() != 21
         || chapter_ids
@@ -212,28 +186,27 @@ pub(super) fn process_site_check<'a>(
         .into_iter()
         .filter(|s| s.ends_with(".md"))
         .collect();
-    if source_files.len() != lessons.len()
-        || lessons
+    if source_files.len() != input.lessons.len()
+        || input
+            .lessons
             .iter()
             .any(|l| !source_files.contains(&format!("{}.md", l.slug)))
     {
         errors.push("Markdown 檔案與 catalog.json 不一致".into());
     }
     let mut pages = BTreeMap::new();
-    for _ in 0..n {
-        let route = field(f)?;
-        let h1 = count(f, 5000)?;
-        let main = count(f, 5000)?;
-        let lang = field(f)?;
-        let missing_alt = count(f, 5000)?;
-        let ids = strings(f, 20_000)?;
-        if !unique(&ids) {
+    for page in &input.pages {
+        let route = page.route.as_str();
+        let (h1, main, missing_alt) = (page.h1, page.main, page.missing_alt);
+        let lang = page.lang.as_str();
+        let ids = &page.ids;
+        if !unique(ids) {
             errors.push(format!("{route} 有重複 id"))
         }
         if h1 != 1 {
             errors.push(format!("{route} 必須包含單一 H1"))
         }
-        if main != 1 || !ids.contains(&"main") {
+        if main != 1 || !ids.iter().any(|id| id == "main") {
             errors.push(format!("{route} 缺少內容地標"))
         }
         if lang != "zh-Hant" {
@@ -242,23 +215,7 @@ pub(super) fn process_site_check<'a>(
         if missing_alt > 0 {
             errors.push(format!("{route} 圖片缺少替代文字"))
         }
-        let mut notes = Vec::new();
-        for _ in 0..count(f, 5000)? {
-            notes.push(Note {
-                kind: field(f)?,
-                role: field(f)?,
-                title: field(f)?,
-            })
-        }
-        let mut links = Vec::new();
-        for _ in 0..count(f, 20_000)? {
-            links.push(Link {
-                address: field(f)?,
-                path: field(f)?,
-                hash: field(f)?,
-            })
-        }
-        if pages.insert(route, Page { ids, notes, links }).is_some() {
+        if pages.insert(route, page).is_some() {
             return Err("重複頁面路徑".into());
         }
     }
@@ -268,24 +225,25 @@ pub(super) fn process_site_check<'a>(
         format!("{base}404.html"),
     ]
     .into_iter()
-    .chain(lessons.iter().map(|l| l.route.clone()))
+    .chain(input.lessons.iter().map(|l| format!("{base}{}/", l.path)))
     {
         if !pages.contains_key(route.as_str()) {
             errors.push(format!("{route} 尚未生成"))
         }
     }
-    for l in lessons.iter().filter(|l| l.chapter) {
-        if let Some(page) = pages.get(l.route.as_str()) {
-            let kinds: Vec<_> = page.notes.iter().map(|n| n.kind).collect();
+    for l in input.lessons.iter().filter(|l| l.chapter) {
+        let route = format!("{base}{}/", l.path);
+        if let Some(page) = pages.get(route.as_str()) {
+            let kinds: Vec<_> = page.notes.iter().map(|n| n.kind.as_str()).collect();
             if kinds.is_empty()
                 || kinds != l.notes
                 || kinds.iter().any(|k| !super::KINDS.contains(k))
             {
-                errors.push(format!("{} 教學方塊與教材來源不一致", l.route));
+                errors.push(format!("{} 教學方塊與教材來源不一致", route));
             }
             for note in &page.notes {
-                if !check_note(note.title, note.role) {
-                    errors.push(format!("{} 教學方塊缺少文字標題或語意", l.route))
+                if !check_note(&note.title, &note.role) {
+                    errors.push(format!("{} 教學方塊缺少文字標題或語意", route))
                 }
             }
         }
@@ -300,7 +258,7 @@ pub(super) fn process_site_check<'a>(
                 errors.push(format!("{route}: {} 超出部署子路徑", link.address));
                 continue;
             };
-            if let Some(target) = pages.get(link.path) {
+            if let Some(target) = pages.get(link.path.as_str()) {
                 if !link.hash.is_empty() && !target.ids.contains(&link.hash) {
                     errors.push(format!("{route}: 錨點不存在 {}", link.address))
                 }
@@ -311,40 +269,40 @@ pub(super) fn process_site_check<'a>(
             }
         }
     }
-    let layout = field(f)?;
-    let report_pages = count(f, 1000)?;
-    let report_count = count(f, 1000)?;
-    let mut report_valid =
-        layout == "rust" && report_pages == pages.len() && report_count == lessons.len();
+    let report = &input.report;
+    let mut report_valid = report.layout == "rust"
+        && report.pages == pages.len()
+        && report.markdown.len() == input.lessons.len();
     let mut has_rust = false;
-    for i in 0..report_count {
-        let slug = field(f)?;
-        let renderer = field(f)?;
-        report_valid &= lessons.get(i).is_some_and(|l| l.slug == slug) && renderer == "rust";
+    for (i, &(slug, renderer)) in report.markdown.iter().enumerate() {
+        report_valid &= input.lessons.get(i).is_some_and(|l| l.slug == slug) && renderer == "rust";
         has_rust |= renderer == "rust";
     }
     if !report_valid || !has_rust {
         errors.push("Rust 渲染報告不完整".into())
     }
-    let renderer = field(f)?;
-    let native = count(f, 100_000)?;
-    let total = count(f, 100_000)?;
-    let fallback = count(f, 100_000)?;
-    if renderer != "rust" || native != total || total != total_fences || fallback != 0 {
+    if report.renderer != "rust"
+        || report.native != report.total
+        || report.total != total_fences
+        || report.fallback != 0
+    {
         errors.push("Rust 高亮報告未達零回退".into())
     }
-    let shape_valid = flag(f)?;
-    let expected_index = read_index(f)?;
-    let index = read_index(f)?;
+    let index = &input.index;
+    let expected_index = &input.expected_index;
+    let shape_valid = input.shape_valid;
     if !shape_valid || index != expected_index {
         errors.push("Rust 搜尋索引與原有資料契約不一致".into())
     }
-    let index_valid = index.len() == lessons.len()
+    let index_valid = index.len() == input.lessons.len()
         && index.iter().all(|entry| {
             !entry.text.is_empty()
-                && pages
-                    .get(entry.href)
-                    .is_some_and(|p| entry.headings.iter().all(|(id, _)| p.ids.contains(id)))
+                && pages.get(entry.href).is_some_and(|p| {
+                    entry
+                        .headings
+                        .iter()
+                        .all(|(id, _)| p.ids.iter().any(|value| value == id))
+                })
         });
     if !index_valid {
         errors.push("搜尋索引的頁面或章節定位不完整".into())
@@ -361,15 +319,12 @@ pub(super) fn process_site_check<'a>(
     if !errors.is_empty() {
         return Err(errors.join("\n"));
     }
-    for value in [
-        lessons.len() as u64,
-        pages.len() as u64,
-        checked as u64,
+    Ok(Summary {
+        lessons: input.lessons.len(),
+        pages: pages.len(),
+        links: checked,
         bytes,
-    ] {
-        emit(out, &value.to_string())?;
-    }
-    Ok(())
+    })
 }
 #[cfg(test)]
 mod tests {

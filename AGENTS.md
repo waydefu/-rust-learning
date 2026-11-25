@@ -6,3 +6,5 @@
 - 僅修改任務相關檔案。章節內容由 Markdown 維護，課程階段、圖解、測驗與共用圖示維護於 `content/site-data.json`。用 Git 回退內容或程式碼。
 - 驗證依變更範圍選擇。在本機執行的指令、Actions 結果、部署結果、線上實測分開記錄。手機裝置測試請標明是實機或瀏覽器模擬。
 - 外部服務安裝或設定、正式公開發布、付費、不可逆刪除與機密處理須取得對應授權。
+
+- 舊 Node 與歷史 stdin 協定已退役。完整產物驗收使用 `tests/fixtures/site-baseline.json.gz` 的已核准逐檔雜湊；不得自動更新基準或重新引入雙套實作。預期輸出變更須附差異與回歸證據；範例隔離驗證使用 `scripts/regression/check-sandbox.sh`。

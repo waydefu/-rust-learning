@@ -1,14 +1,20 @@
 [package]
 name = "site-render"
-version = "0.1.0"
-edition = "2024"
-rust-version = "1.85.1"
-publish = false
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
 
 [dependencies]
+lesson-check = { path = "../lesson-check" }
+site-tools = { path = "../site-tools" }
 pulldown-cmark = { version = "=0.13.6", default-features = false, features = ["html"] }
 unicode-normalization = "=0.1.24"
 unicode-general-category = "=1.0.0"
+serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = "=1.0.140"
-scraper = { version = "=0.22.0", default-features = false }
+scraper = { version = "=0.25.0", default-features = false }
 url = "=2.5.9"
+
+[target.'cfg(unix)'.dependencies]
+libc = "=0.2.191"

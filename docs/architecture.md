@@ -2,7 +2,7 @@
 
 ## 靜態網站
 
-建置首先呼叫 Rust 2024 Edition 的原生教材檢查工具 `tools/lesson-check`，使用標準函式庫驗證方塊格式及自然標題。接著 Rust 的 pulldown-cmark 產生正文，與 Node.js markdown-it 的既有 DOM 比對以確認相容；Rust 產生 Rust、Shell、TOML 與文字程式區塊的高亮 HTML；highlight.js 只作舊版逐字比對，不相符即拒絕建置。每章輸出各自的 `index.html`，網址可分享、深層連結可重新整理。少量瀏覽器原生 JS 提供搜尋、測驗、複製、主題、互動圖解與本機進度。搜尋索引在有搜尋詞時才下載，包含各章文字、程式碼及標題，支援繁體中文子字串與 Rust 診斷碼。閱讀、章節導覽與展開測驗解析可在關閉 JavaScript 時使用。
+建置首先直接呼叫 Rust 2024 Edition 的原生教材檢查函式庫 `tools/lesson-check`，以標準函式庫驗證方塊格式及自然標題。pulldown-cmark 產生 CommonMark 正文，Rust 原生產生 Rust、Shell、TOML 與文字高亮及全部模板。每章輸出獨立 index.html，瀏覽器 ES modules 提供搜尋、測驗、複製、主題、互動圖解與進度；搜尋索引按需下載。停用 JavaScript 仍能閱讀與展開測驗解析。
 
 CommonMark 可以直接在 GitHub 與 HackMD 編輯。技術圖解使用同庫 SVG 和 HTML/CSS，所有權圖由步驟資料驅動。GitHub Pages 提供靜態部署，讀者無須建立帳號，網站無需維護後端和資料庫。`BASE_PATH` 集中處理專案網站子路徑。
 
@@ -10,21 +10,21 @@ CommonMark 可以直接在 GitHub 與 HackMD 編輯。技術圖解使用同庫 S
 
 ## Rust 化的演進方向
 
-正式建置與檢查入口為 `site-render build/check/check-rust/dev`。Rust 使用 serde_json 讀取 catalog 與互動資料、pulldown-cmark 解析 Markdown、scraper/html5ever 解析 HTML5、url 進行 WHATWG URL 解析，並以原生模組產生頁面、搜尋索引、診斷報告及執行教材範例。Node 舊版只在 CI 內做比較與瀏覽器測試。維持既有網址、錨點、HackMD、學習紀錄及純靜態 Pages，保留必要的瀏覽器 JavaScript，不引入 Wasm。
+正式入口為 `site-render build/check/check-rust/dev`。課程目錄、site-data、搜尋索引及渲染報告使用 Serde 具名 schema；pulldown-cmark 解析 Markdown、scraper/html5ever 解析 HTML5、url 解析 WHATWG URL。所有原生模組及工具在 Cargo Workspace 內直接呼叫，不含歷史封包或 Node 建置器。
 
 ### Rust 正文與 HTML 模板
 
-`tools/site-render` 使用鎖定版 pulldown-cmark 0.13.0（Rust 1.71.1 以上可編譯）解析 CommonMark，開啟表格與刪除線。Rust 接收原始 Markdown、現有章節錨點及高亮程式片段，檢查程式區塊內容與順序、標題層級，轉換教學方塊，拒絕不安全的 URL 並跳脫原始 HTML。Node 端以解析後 DOM 的標籤、屬性與文字（程式碼精確比對）作為相容性閘門；任何正文或高亮差異均停止建置，成功報告記錄零回退。每個 HTML 文件的外層模板均由 Rust 產生，與原模板逐字比對，失敗則停止建置。
+`tools/site-render` 使用鎖定 pulldown-cmark 0.13.6。原生 Markdown 驗證程式區塊、標題、教學方塊、安全 URL 並跳脫原始 HTML。CI 比對已核准的 51 檔完整產物雜湊（根目錄與 Pages 路徑各一套）；基準來自先前逐位元組比對及 rust-anything 重播成功的證據。現行流程不執行舊版。
 
-舊版 Node 渲染器只用於 CI 的相容性測試，不會被 Rust CLI 呼叫。獨立 job 阻擋 Node/npm/npx 並確認沒有 node_modules。Pages build job 同樣不安裝 npm 依賴。完整網站樹逐位元組比對，渲染報告則比較 JSON 資料；不將報告當作所有未來輸入相容的保證。
+Node 舊版建置器及遷移協定已退役；Node 僅供 Playwright、axe 與獨立回歸測試。獨立原生 job 阻擋 Node/npm/npx，Pages build 同樣不安裝 npm 依賴。回歸基準不得自動覆寫，見 tests/fixtures/README.md。
 
 ### 靜態產物寫入與行為重播
 
-Rust `site-write` 接收所有生成檔案的 UTF-8 欄位，驗證路徑與重複項，原生複製靜態資源，先在暫存目錄完成輸出，再替換 dist；失敗時保留前版（若回復也失敗，保留備份並回報）。拒絕路徑遍歷及資源符號連結。Node 原寫入器僅供 CI 對照。rust-anything 的外部行為錄製與重播在獨立暫存目錄執行，並保留證據；全量建置額外逐位元組比對網站輸出。詳見 [Rust 移植紀錄](rust-port.md)。
+Rust `site_tools::site_write::write_site` 接收具名檔案集合，檢查路徑、重複、符號連結，先完成暫存產物，再替換 dist；失敗保留前版。已退役 stdin CLI，測試直接驗證 typed API。歷史移植證據見 [Rust 移植紀錄](rust-port.md)。
 
 ### 搜尋索引與預覽介面
 
-`tools/site-tools` 是無第三方依賴的 Rust 2024 crate。原生 Markdown 解析器透過 stdin 傳遞版本化的 UTF-8 欄位（NUL 分隔；建置器拒絕欄位內的 NUL，資料上限 16 MiB），Rust 驗證資料並產生既有 JSON schema，保留標題、診斷碼、程式內容、網址及二至三級錨點。這是兩個 Rust 工具之間的內部介面。原生 check 重新讀取教材並比對搜尋索引完整欄位，CI 再與舊版 JS 索引逐位元組比對。
+`tools/site-tools` 是無第三方依賴的 Rust 2024 crate。搜尋索引從具名教材與標題資料直接序列化，原生 check 重新讀教材比對完整索引欄位；不再有工具間 stdin 封包。
 
 `npm run dev` 建置後啟動 Rust `site-preview`，支援 GET/HEAD、子路徑、目錄索引、308、404、MIME 類型與簡單的 HTTP 請求大小及讀寫逾時限制。它只供本機開發，預設綁定 loopback；會解碼並檢查路徑、拒絕遍歷及指向根目錄外的符號連結，但不是完整生產級 HTTP 實作。GitHub Pages 仍直接發布 dist，預覽工具不會在公開網站上執行。CI 會用 curl 實際請求預覽伺服器並比對搜尋索引。
 
@@ -46,7 +46,7 @@ HackMD 同步教學也列出免費方案的同步次數限制。實際配額以�
 
 ## 來源與依賴
 
-pulldown-cmark 及其建置期依賴以 tools/site-render/Cargo.lock 鎖定。markdown-it 與 highlight.js 在 Node 建置期提供舊版相容性對照，由 npm 鎖檔固定版本。網站輸出包含兩者的授權文字。Playwright、axe 和 parse5 用於驗證。Rand 0.9.5（MIT 或 Apache-2.0）和 Tokio 1.54.1（MIT）僅用於編譯和執行教材範例，依賴固定在 Cargo.lock。原始教材的公開與授權條款由擁有者決定。 [Rand](https://crates.io/crates/rand/0.9.5) · [Tokio](https://crates.io/crates/tokio/1.54.1)
+Rust 工具依賴鎖定於 tools/Cargo.lock，外部教材依賴獨立在 examples/Cargo.lock。歷史 markdown-it 與 highlight.js 授權文字繼續保留，以尊重移植來源。現行 npm 只保留 Playwright 與 axe 測試。
 
 ## 參考專案
 

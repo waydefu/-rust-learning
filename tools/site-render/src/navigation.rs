@@ -1,26 +1,17 @@
 //! Native sidebar renderer. Icons are trusted static SVG from the icon library.
-use super::{Result, count, emit, escape, field};
+use super::escape;
 
-struct Chapter<'a> {
-    id: &'a str,
-    path: &'a str,
-    title: &'a str,
+pub(super) struct Chapter<'a> {
+    pub(super) id: &'a str,
+    pub(super) path: &'a str,
+    pub(super) title: &'a str,
 }
-struct Stage<'a> {
-    id: &'a str,
-    title: &'a str,
-    chapters: Vec<Chapter<'a>>,
+pub(super) struct Stage<'a> {
+    pub(super) id: &'a str,
+    pub(super) title: &'a str,
+    pub(super) chapters: Vec<Chapter<'a>>,
 }
 
-fn safe_path(s: &str) -> bool {
-    !s.is_empty()
-        && s.split('/').all(|p| {
-            !p.is_empty()
-                && !matches!(p, "." | "..")
-                && p.bytes()
-                    .all(|b| b.is_ascii_alphanumeric() || b"_.-".contains(&b))
-        })
-}
 fn current_attr(active: bool) -> &'static str {
     if active { " aria-current=\"page\"" } else { "" }
 }
@@ -40,7 +31,7 @@ fn row(base: &str, path: &str, label: &str, icon: &str, current: &str, meta: &st
         current_attr(current == path)
     )
 }
-fn navigation(
+pub(super) fn navigation(
     base: &str,
     stages: &[Stage<'_>],
     resources: usize,
@@ -78,60 +69,6 @@ fn navigation(
             }
         )
     )
-}
-pub(super) fn process_navigation<'a>(
-    n: usize,
-    fields: &mut impl Iterator<Item = &'a str>,
-    out: &mut Vec<u8>,
-) -> Result<()> {
-    let base = field(fields)?;
-    if base != "/"
-        && (!base.starts_with('/') || !base.ends_with('/') || !safe_path(&base[1..base.len() - 1]))
-    {
-        return Err("導覽基礎網址無效".into());
-    }
-    let resources = count(fields, 1000)?;
-    let icons = (0..5).map(|_| field(fields)).collect::<Result<Vec<_>>>()?;
-    let mut stages = Vec::new();
-    let mut seen = std::collections::HashSet::new();
-    for _ in 0..count(fields, 100)? {
-        let id = field(fields)?;
-        let title = field(fields)?;
-        if !safe_path(id) || id.contains('/') {
-            return Err("課程群組無效".into());
-        }
-        let mut chapters = Vec::new();
-        for _ in 0..count(fields, 1000)? {
-            let id = field(fields)?;
-            let path = field(fields)?;
-            let title = field(fields)?;
-            if id.len() != 2
-                || !id.bytes().all(|b| b.is_ascii_digit())
-                || !seen.insert(id)
-                || !safe_path(path)
-            {
-                return Err("章節導覽資料無效".into());
-            }
-            chapters.push(Chapter { id, path, title });
-        }
-        stages.push(Stage {
-            id,
-            title,
-            chapters,
-        });
-    }
-    for _ in 0..n {
-        let current = field(fields)?;
-        let id = field(fields)?;
-        if !current.is_empty() && !safe_path(current) {
-            return Err("目前網址無效".into());
-        }
-        emit(
-            out,
-            &navigation(base, &stages, resources, &icons, current, id),
-        )?;
-    }
-    Ok(())
 }
 #[cfg(test)]
 mod tests {
